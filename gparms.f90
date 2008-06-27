@@ -13,7 +13,7 @@
 !               School for Marine Science and Technology     
 !               University of Massachusetts-Dartmouth
 !
-! Comments:     Oscar Global Parameters
+! Comments:     FISCM Global Parameters
 !=======================================================================
 
 Module Gparms  
