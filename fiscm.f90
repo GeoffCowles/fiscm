@@ -18,7 +18,7 @@ Program fiscm
   type(igroup), allocatable :: igroups(:)
   integer :: ngroups
 
-  ngroups = 1
+  ngroups = 2
   allocate(igroups(ngroups))
   igroups(1) = group_(21)
   igroups(2) = group_(15)

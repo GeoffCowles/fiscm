@@ -36,8 +36,12 @@ type pvar
   character(len=cstr) :: units
   character(len=cstr) :: from_extern_var
   integer             :: output
-  integer,  allocatable, dimension(:) :: ivar
-  real(sp), allocatable, dimension(:) :: fvar
+!  switch to allocatable type components when gfortran 4.2+ 
+!  in general use
+!  integer,  allocatable, dimension(:) :: ivar
+!  real(sp), allocatable, dimension(:) :: fvar
+  integer,  pointer, dimension(:) :: ivar
+  real(sp), pointer, dimension(:) :: fvar
 end type pvar
   
 !-------------------------------------------------------
@@ -112,7 +116,6 @@ function get_pvar(plist,vname) result(p)
   character(len=*), intent(in) :: vname
   logical :: found
   type(pvar_node), pointer :: plst,pnew
-  integer :: i
   found = .false.
   
   plst => plist%begin
