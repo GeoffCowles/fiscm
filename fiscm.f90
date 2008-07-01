@@ -9,6 +9,11 @@
 ! THIS ORIGINAL HEADER MUST BE MAINTAINED IN ALL DISTRIBUTED
 ! VERSIONS.
 !
+! Major Todos:
+!    1.) migrate to D.S. netcdf libraries
+!    2.) migrate to D.S. time type
+!    3.) openmp doloops to multithread heavier sections 
+!        parallel random number generator?
 !=======================================================================
 
 Program fiscm
@@ -16,6 +21,7 @@ Program fiscm
   use mod_igroup
   use mod_AD
   use bio
+  use output_routines
   integer :: i
 
   type(igroup), allocatable :: igroups(:)
@@ -51,7 +57,7 @@ Program fiscm
 	
     !call bio(igroups,t)
 
-    !call output(igroups,t)
+    call output(ngroups,igroups,t)
 
     t = t + deltaT
   end do

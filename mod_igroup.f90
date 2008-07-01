@@ -11,9 +11,6 @@
 !
 ! Comments:     FISCM - Groups of Like Individuals 
 ! 
-! Major Todos:
-!    1.) migrate to D. Stuebe's netcdf libraries
-!    2.) migrate to D. Stuebe's time type
 !=======================================================================
 
 Module mod_igroup
@@ -36,6 +33,10 @@ type igroup
   integer             :: vdiff_type
   real(sp)            :: DT_bio       !time step for biology
   logical             :: biology
+  real(sp)            :: intvl_out
+  real(sp)            :: tlast_out
+  real(sp)            :: start_out
+  integer             :: frame_out
   type(pvar_list)     :: state
 end type igroup 
 
@@ -61,6 +62,8 @@ function group_(i) result (g)
 	stop 
   endif
 
+  !initial conditions for scalar components of group type, should initialize within type definition, but
+  !this is not allowed on some older compilers
   g%Tnind = i
   g%nind  = i      !gwc?
   g%DT_bio = 3600. !gwc?
@@ -70,6 +73,10 @@ function group_(i) result (g)
   g%problem_dimension = 0
   g%hdiff_type = HDIFF_NONE
   g%vdiff_type = HDIFF_NONE
+  g%frame_out  = 0
+  g%start_out  = 0.0
+  g%intvl_out  = 7200.
+  g%tlast_out  = g%start_out - g%intvl_out
 
   !(x) - x location of particle in the domain
   call add_state(g,'x','x location of particle','m',NETCDF_YES,1.0)

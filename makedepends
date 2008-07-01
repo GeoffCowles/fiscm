@@ -1,0 +1,14 @@
+gparms.o : gparms.f90 
+mod_pvar.o : mod_pvar.f90 gparms.o 
+mod_igroup.o : mod_igroup.f90 mod_pvar.o gparms.o 
+bio.o : bio.f90 mod_igroup.o gparms.o 
+adv_diff.o : adv_diff.f90 mod_igroup.o gparms.o 
+output.o : output.f90 mod_igroup.o gparms.o 
+fiscm.o : fiscm.f90 output.o bio.o adv_diff.o mod_igroup.o gparms.o 
+gparms.o : gparms.f90 
+mod_pvar.o : mod_pvar.f90 gparms.o 
+mod_igroup.o : mod_igroup.f90 mod_pvar.o gparms.o 
+bio.o : bio.f90 mod_igroup.o gparms.o 
+adv_diff.o : adv_diff.f90 mod_igroup.o gparms.o 
+output.o : output.f90 mod_igroup.o gparms.o 
+fiscm.o : fiscm.f90 output.o bio.o adv_diff.o mod_igroup.o gparms.o 
