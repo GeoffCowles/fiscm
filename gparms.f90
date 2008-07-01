@@ -99,4 +99,15 @@ integer, parameter :: EXITED = -1
 integer, parameter :: UNKNOWN = 0
 integer, parameter :: ACTIVE = 1
 
+!----------------------------------------------------------------
+! diffusion type
+!----------------------------------------------------------------
+integer, parameter :: HDIFF_NONE     = 0
+integer, parameter :: HDIFF_CONSTANT = 1
+integer, parameter :: HDIFF_VISSER   = 2
+integer, parameter :: VDIFF_NONE     = 0
+integer, parameter :: VDIFF_CONSTANT = 1
+integer, parameter :: VDIFF_VISSER   = 2
+
+
 End Module Gparms

@@ -10,6 +10,10 @@
 ! VERSIONS.
 !
 ! Comments:     FISCM - Groups of Like Individuals 
+! 
+! Major Todos:
+!    1.) migrate to D. Stuebe's netcdf libraries
+!    2.) migrate to D. Stuebe's time type
 !=======================================================================
 
 Module mod_igroup
@@ -22,10 +26,14 @@ Implicit None
 !Group type
 type igroup 
   integer             :: nstate
+  integer             :: problem_dimension
   character(len=fstr) :: group_name
   integer             :: Tnind
   integer             :: nind
-  real(sp)            :: hdiff
+  real(sp)            :: hdiff_const_val
+  real(sp)            :: vdiff_const_val
+  integer             :: hdiff_type
+  integer             :: vdiff_type
   real(sp)            :: DT_bio       !time step for biology
   logical             :: biology
   type(pvar_list)     :: state
@@ -59,6 +67,9 @@ function group_(i) result (g)
   g%state = pvar_list_()
   g%nstate = 0
   g%group_name = ""
+  g%problem_dimension = 0
+  g%hdiff_type = HDIFF_NONE
+  g%vdiff_type = HDIFF_NONE
 
   !(x) - x location of particle in the domain
   call add_state(g,'x','x location of particle','m',NETCDF_YES,1.0)

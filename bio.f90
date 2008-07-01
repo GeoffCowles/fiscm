@@ -111,7 +111,8 @@ subroutine advance_bio(g,mtime)
   end do !end main loop
 
   !debug
-  write(*,*)mtime/(3600*24),stage(1)
+  !write(*,*)mtime/(3600*24),stage(1)
+
 end subroutine advance_bio
 
 

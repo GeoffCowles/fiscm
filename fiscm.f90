@@ -14,17 +14,24 @@
 Program fiscm
   use gparms 
   use mod_igroup
+  use mod_AD
   use bio
+  integer :: i
+
   type(igroup), allocatable :: igroups(:)
-  integer :: ngroups,i
   real(sp) :: beg_time,end_time
   real(sp) :: deltaT
+  integer  :: sim_direction
+  integer  :: ngroups
 
+  !---------------------------------------------------
+  ! initialize groups and data
+  !---------------------------------------------------
   ngroups = 2
   allocate(igroups(ngroups))
   igroups(1) = group_(21)
   igroups(2) = group_(15)
-  beg_time = 0.0
+  beg_time   = 0.0
   end_time   = 24*3600*20.
   deltaT     = 3600
 
@@ -34,14 +41,24 @@ Program fiscm
 
   call init_bio(igroups(1),5)
   
+  !---------------------------------------------------
+  ! main loop over time 
+  !---------------------------------------------------
   t = beg_time
   do while (t <= end_time)
-    call advance_bio(igroups(1),t)
+	
+	call adv_diff(ngroups,igroups,t)
+	
+    !call bio(igroups,t)
+
+    !call output(igroups,t)
+
     t = t + deltaT
   end do
 
-  
-
+  !---------------------------------------------------
+  ! cleanup data
+  !---------------------------------------------------
   deallocate(igroups)
 
 

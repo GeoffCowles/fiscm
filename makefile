@@ -45,7 +45,7 @@
 #--------------------------------------------------------------------------
 
 
-F95FILES=    gparms.f90 mod_pvar.f90 mod_igroup.f90 bio.f90 fiscm.f90
+F95FILES=    gparms.f90 mod_pvar.f90 mod_igroup.f90 bio.f90 adv_diff.f90 fiscm.f90
 
 
  SRCS = $(F95FILES) 
