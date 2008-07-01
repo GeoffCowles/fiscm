@@ -17,21 +17,30 @@ Program fiscm
   use bio
   type(igroup), allocatable :: igroups(:)
   integer :: ngroups,i
+  real(sp) :: beg_time,end_time
+  real(sp) :: deltaT
 
   ngroups = 2
   allocate(igroups(ngroups))
   igroups(1) = group_(21)
   igroups(2) = group_(15)
-
-  call init_bio(igroups(1),100)
-
-  
-
-  call advance_bio(igroups(1))
+  beg_time = 0.0
+  end_time   = 24*3600*20.
+  deltaT     = 3600
 
   do i=1,ngroups
-  call print_group_summary(igroups(i))
+    call print_group_summary(igroups(i))
   end do
+
+  call init_bio(igroups(1),5)
+  
+  t = beg_time
+  do while (t <= end_time)
+    call advance_bio(igroups(1),t)
+    t = t + deltaT
+  end do
+
+  
 
   deallocate(igroups)
 

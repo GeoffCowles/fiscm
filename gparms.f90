@@ -85,4 +85,18 @@ real(sp), parameter :: tinynum = tiny(1.0_sp)
 integer, parameter :: NETCDF_YES = 1
 integer, parameter :: NETCDF_NO  = 0
 
+!----------------------------------------------------------------
+! status of individuals
+!    DEAD: -3
+!    SETTLED: -2
+!    EXITED DOMAIN: -1
+!    UNKNOWN: 0
+!    ACTIVE: 1
+!----------------------------------------------------------------
+integer, parameter :: DEAD = -3
+integer, parameter :: SETTLED = -2
+integer, parameter :: EXITED = -1
+integer, parameter :: UNKNOWN = 0
+integer, parameter :: ACTIVE = 1
+
 End Module Gparms

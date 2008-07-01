@@ -83,18 +83,17 @@ subroutine add_pvar_node(plist,p)
   type(pvar)      :: p
   type(pvar_node), pointer :: plst,pnew
 
-  write(*,*)p%idim
   plst => plist%begin
   pnew => plst%next
   do 
    if(.not.associated(pnew))then
-	 write(*,*)'added a node to state var link list'
      allocate(plst%next)
-     write(*,*)'allocated it',p%idim
-     allocate(plst%next%v%fvar(p%idim))
-     write(*,*)'allocated that'
+     if(p%istype == ftype)then
+       allocate(plst%next%v%fvar(p%idim))
+     else if(p%istype == itype)then
+	   allocate(plst%next%v%ivar(p%idim))
+	 endif
      plst%next%v = p
-     write(*,*)'did it',plst%next%v%varname
      nullify(plst%next%next)
      exit
    endif
@@ -151,7 +150,6 @@ end function get_pvar
     
 subroutine print_state_vars(plist)
   type(pvar_list) :: plist
-  type(pvar), pointer :: p
   type(pvar_node), pointer :: plst,pnew
   
   plst => plist%begin
