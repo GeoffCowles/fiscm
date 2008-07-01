@@ -34,14 +34,14 @@ real(sp), parameter :: one   = 1.000_sp
 !string length
 !    fstr:    filename length
 !    vstr:    variable name length
-!    sstr:    subroutine name length
+!    sstr:    short string length
 !    tstr:    text string
 !    cstr:    string variable standard length
 !----------------------------------------------------------------
 integer, parameter  :: fstr = 120  
 integer, parameter  :: tstr = 120 
 integer, parameter  :: vstr = 30    
-integer, parameter  :: sstr = 30   
+integer, parameter  :: sstr = 15   
 integer, parameter  :: cstr = 30 
 
 !----------------------------------------------------------------

@@ -16,7 +16,7 @@ Program fiscm
   use mod_igroup
   use bio
   type(igroup), allocatable :: igroups(:)
-  integer :: ngroups
+  integer :: ngroups,i
 
   ngroups = 2
   allocate(igroups(ngroups))
@@ -24,8 +24,14 @@ Program fiscm
   igroups(2) = group_(15)
 
   call init_bio(igroups(1),100)
+
+  
+
   call advance_bio(igroups(1))
 
+  do i=1,ngroups
+  call print_group_summary(igroups(i))
+  end do
 
   deallocate(igroups)
 

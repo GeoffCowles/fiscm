@@ -22,7 +22,7 @@ Implicit None
 !Group type
 type igroup 
   integer             :: nstate
-  character(len=fstr) :: species
+  character(len=fstr) :: group_name
   integer             :: Tnind
   integer             :: nind
   real(sp)            :: hdiff
@@ -47,12 +47,16 @@ function group_(i) result (g)
   g%nind  = 0
   g%state = pvar_list_()
   g%nstate = 0
+  g%group_name = ""
 
   !(x) - x location of particle in the domain
   call add_state(g,'x','x location of particle','m',NETCDF_YES,1.0)
+
+  !(y) - y location of particle in the domain
   call add_state(g,'y','y location of particle','m',NETCDF_YES,10.0_sp)
-  write(*,*)'state added?'
   
+  !(status) - particle status
+!  call add_state(g,'status','particle status','-',NETCDF_YES,0)
 
 end function group_
 
@@ -91,5 +95,18 @@ function get_from_state(varname,g) result(v)
    v => p%fvar
    
 end function get_from_state
+
+subroutine print_group_summary(g) 
+   type(igroup)        :: g
+
+   !group parameters
+   write(*,*)
+   write(*,*)'==========================Group Summary=========================='
+   write(*,'(A25,I10)')'total individuals:       ',g%Tnind
+   write(*,'(A25,I10)')'allocated individuals:   ',g%nind
+   call print_state_vars(g%state)
+
+   
+end subroutine print_group_summary
 
 End Module mod_igroup

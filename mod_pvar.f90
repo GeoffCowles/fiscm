@@ -31,7 +31,7 @@ type pvar
   integer :: idim
   integer :: istype
   logical :: isintern
-  character(len=cstr) :: varname
+  character(len=sstr) :: varname
   character(len=cstr) :: longname
   character(len=cstr) :: units
   character(len=cstr) :: from_extern_var
@@ -149,6 +149,32 @@ function get_pvar(plist,vname) result(p)
 
 end function get_pvar
     
+subroutine print_state_vars(plist)
+  type(pvar_list) :: plist
+  type(pvar), pointer :: p
+  type(pvar_node), pointer :: plst,pnew
+  
+  plst => plist%begin
+  pnew => plst%next
+
+  if(.not.associated(plst%next))then
+	write(*,*)'plist has no nodes'
+	stop
+  endif
+  write(*,*)'-----------------------------------------------------------------'
+  write(*,*)'state variable|          long name           | units'
+  write(*,*)'-----------------------------------------------------------------'
+	
+  do 
+	if(.not.associated(plst%next)) exit
+	
+	write(*,'(A15,A1,A30,A1,A30)')pnew%v%varname,'|',pnew%v%longname,'|',pnew%v%units
+    plst => pnew
+	pnew => pnew%next
+  end do
+
+end subroutine print_state_vars
+  
 End Module mod_pvar
 
 
