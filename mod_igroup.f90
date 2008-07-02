@@ -22,6 +22,7 @@ Implicit None
 
 !Group type
 type igroup 
+  integer             :: id
   integer             :: nstate
   integer             :: problem_dimension
   character(len=fstr) :: group_name
@@ -37,6 +38,8 @@ type igroup
   real(sp)            :: tlast_out
   real(sp)            :: start_out
   integer             :: frame_out
+  integer             :: fid_out
+  
   type(pvar_list)     :: state
 end type igroup 
 
@@ -53,9 +56,9 @@ contains
 !---------------------------------------------------------
 !Create the initial group type (passive particle)
 !---------------------------------------------------------
-function group_(i) result (g)
+function group_(i,id) result (g)
   type(igroup) :: g
-  integer, intent(in) :: i
+  integer, intent(in) :: i,id
 
   if(i < 1)then
 	write(*,*) 'error creating group: size must be greater than 0'
@@ -64,6 +67,7 @@ function group_(i) result (g)
 
   !initial conditions for scalar components of group type, should initialize within type definition, but
   !this is not allowed on some older compilers
+  g%id    = id
   g%Tnind = i
   g%nind  = i      !gwc?
   g%DT_bio = 3600. !gwc?

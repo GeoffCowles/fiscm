@@ -3,20 +3,29 @@
             DEF_FLAGS     = -P -C -traditional 
             EXEC          = fiscm 
 #--------------------------------------------------------------------------
+#        NETCDF OUTPUT      NEED NETCDF 3.x 
+#                           NEED FORTRAN90 INTERFACE
+#                           IOLIBS - PATH TO libnetcdf.a
+#                           IOINCS - PATH TO netcdf.mod
+#--------------------------------------------------------------------------
+          IOLIBS       =  -L/usr/local/netcdf/gfortran/lib -lnetcdf
+          IOINCS       =  -I/usr/local/netcdf/gfortran/include
+
+#--------------------------------------------------------------------------
 #  APPLE OS X/Absoft (G5)
 #--------------------------------------------------------------------------
 #         CPPFLAGS = $(DEF_FLAGS)  
 #         ABSOFTLIB = /Applications/Absoft/lib/f77_oldnames.o
 #         CPP      = /usr/bin/cpp
-#         FC       = f90 -YEXT_NAMES=LCS  #-O3
+#         FC       = f90 -YEXT_PFX=_ 
 #         DEBFLGS  =  # -qcheck -C -g
 #         OPT      =
 #--------------------------------------------------------------------------
 # APPLE / gfortran 
 #--------------------------------------------------------------------------
-         CPPFLAGS = $(DEF_FLAGS)
+        CPPFLAGS = $(DEF_FLAGS)
          CPP      = /usr/bin/cpp
-         FC       = gfortran
+         FC       = gfortran #-funderscoring # -fno-second-underscore
          DEBFLGS  = 
          OPT      = 
 #==========================================================================
@@ -28,9 +37,11 @@
          RANLIB = ranlib
 
 #--------------------------------------------------------------------------
-#  Libraries           
+#  Libraries / Include Files          
 #--------------------------------------------------------------------------
 
+	LIBS  =     $(IOLIBS)
+	INCS  =     $(IOINCS) 
 
 #--------------------------------------------------------------------------
 #  Preprocessing and Compilation Directives
@@ -58,7 +69,8 @@ F95FILES=    gparms.f90 mod_pvar.f90 mod_igroup.f90 bio.f90 adv_diff.f90\
 #--------------------------------------------------------------------------
 
 $(EXEC):	$(OBJS)
-		$(FC) $(FFLAGS) $(LDFLAGS) -o $(EXEC) $(OBJS) $(LIBS)
+		/bin/sh /Users/gcowles/Packages/netcdf/netcdf-3.6.3/libtool  --mode=link gfortran $(FFLAGS) $(INCS) $(LDFLAGS) -o $(EXEC) $(OBJS) /Users/gcowles/Packages/netcdf/netcdf-3.6.3/libsrc/libnetcdf.la  
+#		$(FC) $(FFLAGS) $(LDFLAGS) -o $(EXEC) $(OBJS) $(LIBS)
 
 #--------------------------------------------------------------------------
 #  Target to create dependecies.

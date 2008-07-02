@@ -81,11 +81,11 @@ subroutine advance_bio(g,mtime)
     !update PASD using stage-based Duration
     select case (stage(i))
     case(1)
-      D = 851.*(T(i)-0.84)**-1.91
+      D = 851.*(T(i)-0.84)**(-1.91)
     case(2)
-      D = 200*(T(i)-4.88)**-1.47
+      D = 200*(T(i)-4.88)**(-1.47)
     case(3)
-      D = 252*(T(i)-5.30)**1.45
+      D = 252*(T(i)-5.30)**(1.45)
     case(4)
       D = .3583*T(i)**2 - 14.316*T(i) + 156.895
     case(5)

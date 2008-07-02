@@ -35,8 +35,8 @@ Program fiscm
   !---------------------------------------------------
   ngroups = 2
   allocate(igroups(ngroups))
-  igroups(1) = group_(21)
-  igroups(2) = group_(15)
+  igroups(1) = group_(21,1)
+  igroups(2) = group_(15,2)
   beg_time   = 0.0
   end_time   = 24*3600*20.
   deltaT     = 3600

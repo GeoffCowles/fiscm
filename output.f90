@@ -14,6 +14,7 @@
 module output_routines
 use gparms
 use mod_igroup
+use netcdf
 implicit none
 
 contains
@@ -39,12 +40,42 @@ end subroutine output
 subroutine write_header(g,time)
   type(igroup), intent(inout) :: g
   real(sp), intent(in) :: time
-  write(*,*)'here',time
-
-  g%frame_out = 1
+  character(len=fstr)  :: fname
+  character(len=1)     :: num
+  integer              :: ierr
   
+  
+  g%frame_out = 1
+  write(num,'(I1)') g%id
+
+  !construct the name (eventually use some sim string/directory loc)
+  fname = 'fiscm_'//num//'.nc'
+  write(*,*)'writing header for group: ',g%id,' file: ',trim(fname)
+
+  !open the file - write access
+  call cfcheck( nf90_create(trim(fname),nf90_clobber,g%fid_out) )
+  
+  !global attributes
+  call cfcheck( nf90_put_att(g%fid_out,nf90_global,"code"      ,"FISCM") )
+
+  !write the dimensions 
+
+  !write critical scalar variables
+
+  !write the state variables slated for output
+
+  !close the file
+  call cfcheck( nf90_close(g%fid_out) )
 
 end subroutine write_header
   
+subroutine cfcheck(status)
+    integer, intent ( in) :: status
+
+    if(status /= nf90_noerr) then
+      print *, trim(nf90_strerror(status))
+      stop 
+    end if
+end subroutine cfcheck
 
 end module output_routines
