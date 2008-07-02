@@ -1,0 +1,21 @@
+ &NML_FISCM
+ beg_time        = 0.0 ,
+ end_time        = 1728000.,
+ deltaT          = 3600.,
+ ngroups         = 2
+ /
+
+ &NML_GROUP
+ group_deltaT    = 7200,
+ group_dimension = 5,
+ group_name      = 'the first group',
+ group_bio       = T
+/
+ 
+ &NML_GROUP
+ group_deltaT    = 7200,
+ group_dimension = 4,
+ group_name      = 'the second group',
+ group_bio       = F
+/
+
