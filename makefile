@@ -10,8 +10,13 @@
 #--------------------------------------------------------------------------
 
 #          --- following for oscar/rudy ----
-          IOLIBS       =  /Users/gcowles/Packages/netcdf/netcdf-3.6.3/libsrc/libnetcdf.la
-          IOINCS       =  -I/usr/local/netcdf/gfortran/include
+#          IOLIBS       =  /Users/gcowles/Packages/netcdf/netcdf-3.6.3/libsrc/libnetcdf.la
+#          IOINCS       =  -I/usr/local/netcdf/gfortran/include
+
+#          --- following for minke ----
+             IOLIBS       =  -L/hosts/salmon01/data00/medm/lib  -lnetcdf
+             IOINCS       =  -I/hosts/salmon01/data00/medm/include
+
 
 #--------------------------------------------------------------------------
 #  APPLE OS X/Absoft (G5)
@@ -31,6 +36,16 @@
          FLINK    = /bin/sh /Users/gcowles/Packages/netcdf/netcdf-3.6.3/libtool  --mode=link gfortran
          DEBFLGS  = 
          OPT      = 
+#--------------------------------------------------------------------------
+# LINUX / ifort 
+#--------------------------------------------------------------------------
+        CPPFLAGS = $(DEF_FLAGS)
+         CPP      = /usr/bin/cpp
+         FC       = ifort #-funderscoring # -fno-second-underscore
+         FLINK    = $(FC) 
+         DEBFLGS  =
+         OPT      =
+
 #==========================================================================
 #  END USER DEFINITION SECTION
 #==========================================================================
