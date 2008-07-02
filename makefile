@@ -10,7 +10,8 @@
 #--------------------------------------------------------------------------
 
 #          --- following for oscar/rudy ----
-          IOLIBS       =  /Users/gcowles/Packages/netcdf/netcdf-3.6.3/libsrc/libnetcdf.la
+          #IOLIBS       =  /Users/gcowles/Packages/netcdf/netcdf-3.6.3/libsrc/libnetcdf.la
+		  IOLIBS       =  /usr/local/netcdf/gfortran/lib/libnetcdf.la
           IOINCS       =  -I/usr/local/netcdf/gfortran/include
 
 #          --- following for minke ----
