@@ -8,7 +8,9 @@
 #                           IOLIBS - PATH TO libnetcdf.a
 #                           IOINCS - PATH TO netcdf.mod
 #--------------------------------------------------------------------------
-          IOLIBS       =  -L/usr/local/netcdf/gfortran/lib -lnetcdf
+
+#          --- following for oscar/rudy ----
+          IOLIBS       =  /Users/gcowles/Packages/netcdf/netcdf-3.6.3/libsrc/libnetcdf.la
           IOINCS       =  -I/usr/local/netcdf/gfortran/include
 
 #--------------------------------------------------------------------------
@@ -26,6 +28,7 @@
         CPPFLAGS = $(DEF_FLAGS)
          CPP      = /usr/bin/cpp
          FC       = gfortran #-funderscoring # -fno-second-underscore
+         FLINK    = /bin/sh /Users/gcowles/Packages/netcdf/netcdf-3.6.3/libtool  --mode=link gfortran
          DEBFLGS  = 
          OPT      = 
 #==========================================================================
@@ -69,7 +72,7 @@ F95FILES=    gparms.f90 mod_pvar.f90 mod_igroup.f90 bio.f90 adv_diff.f90\
 #--------------------------------------------------------------------------
 
 $(EXEC):	$(OBJS)
-		/bin/sh /Users/gcowles/Packages/netcdf/netcdf-3.6.3/libtool  --mode=link gfortran $(FFLAGS) $(INCS) $(LDFLAGS) -o $(EXEC) $(OBJS) /Users/gcowles/Packages/netcdf/netcdf-3.6.3/libsrc/libnetcdf.la  
+		$(FLINK) $(FFLAGS) $(INCS) $(LDFLAGS) -o $(EXEC) $(OBJS) $(LIBS)
 #		$(FC) $(FFLAGS) $(LDFLAGS) -o $(EXEC) $(OBJS) $(LIBS)
 
 #--------------------------------------------------------------------------
