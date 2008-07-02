@@ -20,6 +20,21 @@ Use mod_pvar
 
 Implicit None
 
+
+!group - for i/o
+real(sp) :: group_deltat
+integer  :: group_dimension
+character(len=fstr) :: group_name
+logical  :: group_bio
+Namelist /NML_GROUP/ &
+   & group_deltat,       & 
+   & group_dimension,    &
+   & group_name,         &
+   & group_bio
+
+
+
+
 !Group type
 type igroup 
   integer             :: id
@@ -56,9 +71,10 @@ contains
 !---------------------------------------------------------
 !Create the initial group type (passive particle)
 !---------------------------------------------------------
-function group_(i,id) result (g)
+function group_(i,id,bio) result (g)
   type(igroup) :: g
   integer, intent(in) :: i,id
+  logical, intent(in) :: bio
 
   if(i < 1)then
 	write(*,*) 'error creating group: size must be greater than 0'
@@ -81,6 +97,7 @@ function group_(i,id) result (g)
   g%start_out  = 0.0
   g%intvl_out  = 7200.
   g%tlast_out  = g%start_out - g%intvl_out
+  g%biology    = bio
 
   !(x) - x location of particle in the domain
   call add_state(g,'x','x location of particle','m',NETCDF_YES,1.0)
