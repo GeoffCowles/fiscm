@@ -1,0 +1,7 @@
+add namelist control of runtime params
+add namelist setup of groups, state variables
+allow function specification through namelists
+
+add input control
+add interpolation of scalar fields from input
+add advection/diffusion
