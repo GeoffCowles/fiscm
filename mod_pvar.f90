@@ -16,6 +16,7 @@ Module mod_pvar
 
 
 Use gparms
+Use netcdf
 Implicit None
 
 Integer, parameter :: itype = 1
@@ -36,6 +37,7 @@ type pvar
   character(len=cstr) :: units
   character(len=cstr) :: from_extern_var
   integer             :: output
+  integer             :: nc_vid
 !  switch to allocatable type components when gfortran 4.2+ 
 !  in general use
 !  integer,  allocatable, dimension(:) :: ivar
@@ -172,6 +174,110 @@ subroutine print_state_vars(plist)
   end do
 
 end subroutine print_state_vars
+
+subroutine write_cdf_header_vars(plist,fid,dims)
+  type(pvar_list) :: plist
+  integer, intent(in) :: fid
+  integer, intent(in) :: dims(2)
+  type(pvar_node), pointer :: plst,pnew
+  type(pvar), pointer :: dum
+  integer :: ierr
+  
+  plst => plist%begin
+  pnew => plst%next
+
+  if(.not.associated(plst%next))then
+	write(*,*)'plist has no nodes'
+	stop
+  endif
+  do 
+	if(.not.associated(plst%next)) exit
+	  !dump the header if user selected to dump
+   	  if(pnew%v%output == NETCDF_YES)then
+	    dum => pnew%v
+	    select case(dum%istype)
+	    case(ftype)
+          ierr = nf90_def_var(fid,dum%varname,nf90_float,dims,dum%nc_vid)
+          if(ierr /= nf90_noerr) then
+	        write(*,*)'error defining netcdf header for variable: ',dum%varname
+		    write(*,*)trim(nf90_strerror(ierr)) ; stop 
+		  end if
+        case(itype)
+          ierr = nf90_def_var(fid,dum%varname,nf90_int  ,dims,dum%nc_vid)
+          if(ierr /= nf90_noerr) then
+	        write(*,*)'error defining netcdf header for variable: ',dum%varname
+		    write(*,*)trim(nf90_strerror(ierr)) ; stop 
+		  end if
+        case default
+          write(*,*)'not setup for netcdf dumping state variable of type:',dum%istype
+          stop
+        end select
+		ierr = nf90_put_att(fid,dum%nc_vid,"long_name",dum%longname)
+		if(ierr /= nf90_noerr) then
+	        write(*,*)'error defining netcdf header for variable: ',dum%varname
+		    write(*,*)trim(nf90_strerror(ierr)) ; stop 
+		end if
+		
+		ierr = nf90_put_att(fid,dum%nc_vid,"units",dum%units)
+		if(ierr /= nf90_noerr) then
+	        write(*,*)'error defining netcdf header for variable: ',dum%varname
+		    write(*,*)trim(nf90_strerror(ierr)) ; stop 
+		end if
+	  endif
+	
+    plst => pnew
+	pnew => pnew%next
+  end do
+
+end subroutine write_cdf_header_vars
+
+subroutine write_cdf_data(plist,fid,frame)
+  type(pvar_list) :: plist
+  integer, intent(in) :: fid
+  integer, intent(in) :: frame
+  type(pvar_node), pointer :: plst,pnew
+  type(pvar), pointer :: dum
+  integer :: ierr
+  integer :: dims(2)
+
+  dims(1) = 1
+  dims(2) = frame
+  
+  plst => plist%begin
+  pnew => plst%next
+
+  if(.not.associated(plst%next))then
+	write(*,*)'plist has no nodes'
+	stop
+  endif
+  do 
+	if(.not.associated(plst%next)) exit
+	  !dump the variable if user selected to dump
+   	  if(pnew%v%output == NETCDF_YES)then
+	    dum => pnew%v
+	    select case(dum%istype)
+	    case(ftype)
+	      ierr = nf90_put_var(fid, dum%nc_vid, dum%fvar,START=dims)
+          if(ierr /= nf90_noerr) then
+	        write(*,*)'error dumping frame for variable: ',dum%varname
+		    write(*,*)trim(nf90_strerror(ierr)) ; stop 
+		  end if
+        case(itype)
+		  ierr = nf90_put_var(fid, dum%nc_vid, dum%ivar,START=dims)
+          if(ierr /= nf90_noerr) then
+	        write(*,*)'error dumping frame for variable: ',dum%varname
+		    write(*,*)trim(nf90_strerror(ierr)) ; stop 
+		  end if
+        case default
+          write(*,*)'not setup for netcdf dumping state variable of type:',dum%istype
+          stop
+        end select
+	
+	  endif
+    plst => pnew
+	pnew => pnew%next
+  end do
+end subroutine write_cdf_data
   
 End Module mod_pvar
 

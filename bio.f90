@@ -45,6 +45,7 @@ subroutine init_bio(g,Nind)
   call add_state(g,'stage','lobster_stage','-',NETCDF_YES,1)
   call add_state(g,'PASD','currency','-',NETCDF_YES,0.0)
   call add_state(g,'T','temperature','C',NETCDF_YES,15.0)
+  call add_state(g,'N','number_individuals','-',NETCDF_YES,50000)
   
 end subroutine init_bio
 
@@ -96,7 +97,6 @@ subroutine advance_bio(g,mtime)
     end select
 
     PASD(i) = PASD(i) + SCF*(deltaT/86400)*D
-
     !settle the post-larvae 
     if(stage(i)==4 .and. PASD(i) > fcomp_settle)then
 	  status(i) = SETTLED 

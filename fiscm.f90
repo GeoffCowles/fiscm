@@ -22,7 +22,7 @@ Program fiscm
   use mod_AD
   use bio
   use output_routines
-  integer :: i
+  integer :: i,n
 
   type(igroup), allocatable :: igroups(:)
   real(sp) :: beg_time,end_time
@@ -33,19 +33,19 @@ Program fiscm
   !---------------------------------------------------
   ! initialize groups and data
   !---------------------------------------------------
-  ngroups = 2
+  ngroups = 1
   allocate(igroups(ngroups))
-  igroups(1) = group_(21,1)
-  igroups(2) = group_(15,2)
+  igroups(1) = group_(1,1)
+!  igroups(2) = group_(15,2)
   beg_time   = 0.0
-  end_time   = 24*3600*20.
+  end_time   = 24*3600*20
   deltaT     = 3600
 
   do i=1,ngroups
     call print_group_summary(igroups(i))
   end do
 
-  call init_bio(igroups(1),5)
+  call init_bio(igroups(1),1)
   
   !---------------------------------------------------
   ! main loop over time 
@@ -55,7 +55,9 @@ Program fiscm
 	
 	call adv_diff(ngroups,igroups,t)
 	
-    !call bio(igroups,t)
+	do n=1,ngroups
+      call advance_bio(igroups(n),t)
+    end do
 
     call output(ngroups,igroups,t)
 

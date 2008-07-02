@@ -64,12 +64,6 @@ real(sp) :: gacc  = 9.8016_sp !default
 real(sp), parameter :: omega_earth = 7.292e-5
 
 !----------------------------------------------------------------
-!limiting parameters
-!    CFL_MAX:    max practical CFL
-!----------------------------------------------------------------
-real(sp), parameter :: CFL_MAX = 5.0_sp
-
-!----------------------------------------------------------------
 !large and small numbers
 !    hugenum = largest float
 !    tinynum = smallest float

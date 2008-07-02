@@ -39,7 +39,7 @@ type igroup
   real(sp)            :: start_out
   integer             :: frame_out
   integer             :: fid_out
-  
+  character(len=fstr) :: fname_out
   type(pvar_list)     :: state
 end type igroup 
 
@@ -111,12 +111,22 @@ subroutine add_state_fvec(g,varname,longname,units,output,init_val)
    do i=1,g%Tnind
 	 new%fvar(i) = init_val
    end do
+    
+   !check output flag
+   if(output < 0 .or. output > 1)then
+	 write(*,*)'error adding state variable: ',varname
+	 write(*,*)'output argument must be 0 (no output), or 1 (output)'
+     stop
+   endif
  
-   new%istype = ftype
+   new%output   = output
+   new%istype   = ftype
    new%idim     = g%Tnind
    new%varname  = trim(varname)
    new%longname = trim(longname)
    new%units    = trim(units)
+   new%output   = output
+
    call add_pvar_node(g%state,new)
    g%nstate = g%nstate + 1;
 end subroutine add_state_fvec
@@ -138,7 +148,15 @@ subroutine add_state_ivec(g,varname,longname,units,output,init_val)
    do i=1,g%Tnind
 	 new%ivar(i) = init_val
    end do
-   
+  
+   !check output flag
+   if(output < 0 .or. output > 1)then
+	 write(*,*)'error adding state variable: ',varname
+	 write(*,*)'output argument must be 0 (no output), or 1 (output)'
+     stop
+   endif
+
+   new%output   = output 
    new%idim     = g%Tnind
    new%varname  = trim(varname)
    new%longname = trim(longname)
