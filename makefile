@@ -10,8 +10,7 @@
 #--------------------------------------------------------------------------
 
 #          --- following for oscar/rudy ----
-          #IOLIBS       =  /Users/gcowles/Packages/netcdf/netcdf-3.6.3/libsrc/libnetcdf.la
-		  IOLIBS       =  /usr/local/netcdf/gfortran/lib/libnetcdf.la
+	  IOLIBS       =  /usr/local/netcdf/gfortran/lib/libnetcdf.la
           IOINCS       =  -I/usr/local/netcdf/gfortran/include
 
 #          --- following for minke ----
@@ -34,7 +33,7 @@
          CPPFLAGS = $(DEF_FLAGS)
          CPP      = /usr/bin/cpp
          FC       = gfortran #-funderscoring # -fno-second-underscore
-         FLINK    = /bin/sh /Users/gcowles/Packages/netcdf/netcdf-3.6.3/libtool  --mode=link gfortran
+         FLINK    = /bin/sh /usr/local/netcdf/gfortran/bin/libtool  --mode=link gfortran
          DEBFLGS  = 
          OPT      = 
 #--------------------------------------------------------------------------
