@@ -51,7 +51,7 @@ Program fiscm
   ! initialize groups and data
   !---------------------------------------------------
 
-  call init_bio(igroups(1),1)
+  call init_bio(igroups(1),igroups(1)%Tnind)
   !dump group summary to screen
   do n=1,ngroups
     call print_group_summary(igroups(n))
