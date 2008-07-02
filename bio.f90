@@ -92,11 +92,12 @@ subroutine advance_bio(g,mtime)
     case(5)
       D = 0.0
     case default
-      write(*,*)'stage: ',stage(i),' not a valid stage for a lobster'
+      write(*,*)'stage: ',stage(i),' not a valid stage for a Homerus'
       stop
     end select
 
     PASD(i) = PASD(i) + SCF*(deltaT/86400)*D
+
     !settle the post-larvae 
     if(stage(i)==4 .and. PASD(i) > fcomp_settle)then
 	  status(i) = SETTLED 
