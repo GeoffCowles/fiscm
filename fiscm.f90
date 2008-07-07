@@ -50,12 +50,15 @@ Program fiscm
   !---------------------------------------------------
   ! initialize groups and data
   !---------------------------------------------------
-
   call init_bio(igroups(1),igroups(1)%Tnind)
-  !dump group summary to screen
+
+  !---------------------------------------------------
+  ! setup and simulation summary
+  !---------------------------------------------------
   do n=1,ngroups
     call print_group_summary(igroups(n))
   end do
+
   !---------------------------------------------------
   ! main loop over time 
   !---------------------------------------------------
@@ -90,28 +93,31 @@ Subroutine setup
   integer, parameter :: iunit = 33
   integer :: n,ios
 
+  !--------------------------------------------------------
+  ! check for existence of primary control file
+  !--------------------------------------------------------
   inquire(file='fiscm.nml',exist=fexist)
   if(.not.fexist)then
-	write(*,*)'fatal error: namelist file: fiscm.nml does not exist, stopping...'
-	stop 
+    write(*,*)'fatal error: namelist file: fiscm.nml does not exist, stopping...'
+    stop 
   endif
   open(unit=iunit,file='fiscm.nml',form='formatted')
   read(unit=iunit,nml=nml_fiscm,iostat=ios)
   if(ios /= 0)then
-	write(*,*)'fatal error: could not read fiscm namelist from fiscm.nml'
-	stop
+    write(*,*)'fatal error: could not read fiscm namelist from fiscm.nml'
+    stop
   endif
 
   !set values, check validity and report
   if(ngroups < 1)then
-	write(*,*)'Fatal error: number of groups < 1' ; stop 
+    write(*,*)'Fatal error: number of groups < 1' ; stop 
   endif
 
   if(end_time /= beg_time)then
     sim_direction = sign(1., end_time-beg_time)
   else
-	write(*,*)'fatal error: begin and end time are identical'
-	stop
+    write(*,*)'fatal error: begin and end time are identical'
+    stop
   endif
 
   write(*,*)'begin time:  ',beg_time
@@ -124,22 +130,11 @@ Subroutine setup
   !read and allocate individual groups
   allocate(igroups(ngroups))
   do n=1,ngroups
-    read(unit=iunit,nml=nml_group,iostat=ios)
-	if(ios /= 0)then
-      write(*,*)'fatal error: could not read group namelist from fiscm.nml'
-	  stop
-	endif     
-    if(group_dimension < 1)then
-	  write(*,*)'fatal error in group namelist: dimension must be > 0'
-	  stop
-	endif
-	igroups(n) = group_(group_dimension,n,group_bio)
-
-
+    igroups(n) = group_(iunit,n)
   end do
 
- 
-
+  !open output files and assign netcdf ids to each group
+  call cdf_out(ngroups,igroups,0.0,NCDO_HEADER)
   
 
 End Subroutine setup

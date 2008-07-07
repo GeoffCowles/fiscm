@@ -78,6 +78,9 @@ real(sp), parameter :: tinynum = tiny(1.0_sp)
 !----------------------------------------------------------------
 integer, parameter :: NETCDF_YES = 1
 integer, parameter :: NETCDF_NO  = 0
+integer, parameter :: NCDO_HEADER = 0
+integer, parameter :: NCDO_ADD_STATES = 1
+integer, parameter :: NCDO_OUTPUT = 2
 
 !----------------------------------------------------------------
 ! status of individuals

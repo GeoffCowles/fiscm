@@ -28,32 +28,32 @@ subroutine adv_diff(ng,g,time)
   real(sp)    , intent(in   ) :: time
   integer :: n
   do n=1,ng
-	
-	select case(g(n)%problem_dimension)
-	case(0)
-	  cycle
-	case(1)
-	  write(*,*)'1D simulation not setup'
-	  stop
-	case(2)
-	  call advect2D( g(n) )
-	  if(g(n)%hdiff_type == HDIFF_CONSTANT) call rw_hdiff_const( g(n) )
-	  if(g(n)%hdiff_type == HDIFF_VISSER)   call rw_hdiff_visser( g(n) )
-	case(3)
-	  call advect3D( g(n) )
-	  if(g(n)%hdiff_type == HDIFF_CONSTANT) call rw_hdiff_const( g(n) )
-	  if(g(n)%hdiff_type == HDIFF_VISSER)   call rw_hdiff_visser( g(n) )
+
+    select case(g(n)%space_dim)
+    case(0)
+      cycle
+    case(1)
+      write(*,*)'1D simulation not setup'
+      stop
+    case(2)
+      call advect2D( g(n) )
+      if(g(n)%hdiff_type == HDIFF_CONSTANT) call rw_hdiff_const( g(n) )
+      if(g(n)%hdiff_type == HDIFF_VISSER)   call rw_hdiff_visser( g(n) )
+    case(3)
+      call advect3D( g(n) )
+      if(g(n)%hdiff_type == HDIFF_CONSTANT) call rw_hdiff_const( g(n) )
+      if(g(n)%hdiff_type == HDIFF_VISSER)   call rw_hdiff_visser( g(n) )
 !   	  if(g%vdiff_type == VDIFF_CONSTANT) call vdiff_const( g(n) )
 !	  if(g%vdiff_type == VDIFF_VISSER)   call vdiff_visser( g(n) )
-	case default
-	  write(*,*)'problem_dimension must be [0,2,3]'
-	  stop
-	end select
-	
+    case default
+      write(*,*)'space_dim must be [0,2,3]'
+      stop
+    end select
+
   end do
 
 end subroutine adv_diff
-	
+
 !----------------------------------------------------
 ! Random-Walk horizontal diffusion with constant
 !    turbulent eddy diffusivity
@@ -90,6 +90,3 @@ subroutine advect3D(g)
 end subroutine advect3D
 
 End Module mod_AD
-	
-	
-	

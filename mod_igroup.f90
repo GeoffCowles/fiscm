@@ -20,29 +20,56 @@ Use mod_pvar
 
 Implicit None
 
-
 !group - for i/o
+integer  :: Tnind,nind,space_dim,nstate
+integer  :: hdiff_type,vdiff_type
+real(sp) :: DT_bio
+real(sp) :: tlast_out,start_out,intvl_out
 real(sp) :: group_deltat
-integer  :: group_dimension
-character(len=fstr) :: group_name
-logical  :: group_bio
-Namelist /NML_GROUP/ &
-   & group_deltat,       & 
-   & group_dimension,    &
+real(sp) :: hdiff_const_val,vdiff_const_val
+logical  :: biology
+character(len=fstr) :: group_name,fname_out
+character(len=fstr) :: statefile
+
+Namelist /NML_GROUP/     &
+   & Tnind,              &
+   & space_dim,          &
    & group_name,         &
-   & group_bio
+   & hdiff_type,         &
+   & hdiff_const_val,    &
+   & vdiff_type,         &
+   & vdiff_const_val,    &
+   & DT_bio,             &
+   & biology,            &
+   & intvl_out,          &
+   & start_out,          &
+   & nstate,             &
+   & statefile
 
+character(len=fstr) :: state_varname
+character(len=fstr) :: state_longname
+character(len=fstr) :: state_units
+integer             :: state_netcdf_out
+integer             :: state_vartype
+integer             :: state_initval_int
+real(sp)            :: state_initval_flt
 
-
+Namelist /NML_STATEVAR/   &
+   & state_varname,             &
+   & state_longname,            &
+   & state_units,               &
+   & state_netcdf_out,          &
+   & state_vartype,             &
+   & state_initval_int,         &
+   & state_initval_flt
 
 !Group type
 type igroup 
   integer             :: id
-  integer             :: nstate
-  integer             :: problem_dimension
-  character(len=fstr) :: group_name
   integer             :: Tnind
   integer             :: nind
+  integer             :: space_dim
+  character(len=fstr) :: name
   real(sp)            :: hdiff_const_val
   real(sp)            :: vdiff_const_val
   integer             :: hdiff_type
@@ -55,7 +82,9 @@ type igroup
   integer             :: frame_out
   integer             :: fid_out
   character(len=fstr) :: fname_out
+  character(len=fstr) :: statefile
   type(pvar_list)     :: state
+  integer             :: nstate
 end type igroup 
 
 interface add_state
@@ -71,45 +100,104 @@ contains
 !---------------------------------------------------------
 !Create the initial group type (passive particle)
 !---------------------------------------------------------
-function group_(i,id,bio) result (g)
+!function group_(i,id,bio) result (g)
+function group_(fid,id) result(g)
   type(igroup) :: g
-  integer, intent(in) :: i,id
-  logical, intent(in) :: bio
+  integer, intent(in) :: fid
+  integer, intent(in) :: id
+  integer :: ios,i,ns
+  logical :: fexist
 
-  if(i < 1)then
+  !read the group namelist from unit fid
+  read(unit=fid,nml=nml_group,iostat=ios)
+  if(ios /= 0)then
+    write(*,*)'fatal error: could not read group namelist from fiscm.nml'
+	stop
+  endif
+
+  !check problem size
+  if(Tnind < 1)then
 	write(*,*) 'error creating group: size must be greater than 0'
 	stop 
   endif
-
-  !initial conditions for scalar components of group type, should initialize within type definition, but
-  !this is not allowed on some older compilers
-  g%id    = id
-  g%Tnind = i
-  g%nind  = i      !gwc?
-  g%DT_bio = 3600. !gwc?
-  g%state = pvar_list_()
+  !check problem dimension
+  if(space_dim < 0 .or. space_dim > 3)then
+	write(*,*)'fatal error: space dim must be 0,2,3'
+	stop
+  endif
+  g%id     = id           
+  g%Tnind  = Tnind   
+  g%nind   = Tnind    
+  g%space_dim = space_dim
+  g%name   = group_name   
+  g%hdiff_type = hdiff_type
+  g%hdiff_const_val = hdiff_const_val
+  g%vdiff_type = vdiff_type
+  g%vdiff_const_val = vdiff_const_val
+  g%DT_bio = 3600.
+  g%biology = biology
+  g%intvl_out = intvl_out
+  g%tlast_out = 0.0
+  g%start_out = start_out
+  g%frame_out = 0
+  g%fid_out   = 0
+  g%fname_out = ""
   g%nstate = 0
-  g%group_name = ""
-  g%problem_dimension = 0
-  g%hdiff_type = HDIFF_NONE
-  g%vdiff_type = HDIFF_NONE
-  g%frame_out  = 0
-  g%start_out  = 0.0
-  g%intvl_out  = 7200.
-  g%tlast_out  = g%start_out - g%intvl_out
-  g%biology    = bio
+  g%statefile = statefile
+  g%state = pvar_list_() 
 
-  !(x) - x location of particle in the domain
-  call add_state(g,'x','x location of particle','m',NETCDF_YES,1.0)
+  !(x,y,z) - particle position
+  if(g%space_dim > 1)then
+    call add_state(g,'x','x location of particle','m',NETCDF_YES,1.0)
+    call add_state(g,'y','y location of particle','m',NETCDF_YES,0.0)
+    call add_state(g,'pathlength','integrated trajectory','m',NETCDF_YES,0.0)
+  endif
 
-  !(y) - y location of particle in the domain
-  call add_state(g,'y','y location of particle','m',NETCDF_YES,10.0_sp)
-  
+  if(g%space_dim == 3)then
+	call add_state(g,'z','z location of particle','m',NETCDF_YES,0.0)
+  endif
   !(status) - particle status
   call add_state(g,'status','particle status','-',NETCDF_YES,1)
 
-  !(pathlength) - integrated path length
-  call add_state(g,'pathlength','integrated trajectory','m',NETCDF_YES,0.0)
+  !--------------------------------------------------------------------
+  !user-defined state variables
+  !--------------------------------------------------------------------
+  if(statefile=="NONE" .and. nstate > 0)then
+	write(*,*)'fatal error: group: ',trim(group_name) 
+	write(*,*)'number of state variables from namelist: ',nstate
+	write(*,*)'no state variable file specified'
+	stop
+  endif
+
+  if(nstate > 1)then
+    inquire(file=statefile,exist=fexist)
+    if(.not.fexist)then
+      write(*,*)'fatal error: statefile ',trim(statefile),' does not exist'
+ 	  stop
+    endif
+    open(unit=fid+1,file=trim(statefile),form='formatted')
+    do ns = 1,nstate
+	
+	  !read the group namelist from unit fid
+	  read(unit=fid+1,nml=nml_statevar,iostat=ios)
+	  if(ios /= 0)then
+	    write(*,*)'fatal error: could not read statevar namelist from: ',trim(statefile)
+        stop
+	  endif
+	  if(state_vartype == itype)then
+        call add_state(g,trim(state_varname),trim(state_longname),trim(state_units), &
+                     state_netcdf_out,state_initval_int)
+      else if(state_vartype == ftype)then
+  	    call add_state(g,trim(state_varname),trim(state_longname),trim(state_units), &
+                     state_netcdf_out,state_initval_flt)
+	  else
+	    write(*,*)'fatal error: not setup for variable type ',state_vartype,' in group_'
+	    stop
+	  endif
+    end do
+    close(34)
+  end if !g%nstate > 1
+
 
 end function group_
 
@@ -213,14 +301,44 @@ end subroutine get_state_ivec
 subroutine print_group_summary(g) 
    type(igroup)        :: g
 
-   !group parameters
    write(*,*)
    write(*,*)'==========================Group Summary=========================='
-   write(*,'(A25,I10)')'total individuals:       ',g%Tnind
-   write(*,'(A25,I10)')'allocated individuals:   ',g%nind
+   write(*,'(A21,I10)')'group id number   :: ',g%id
+   write(*,'(A21,A20)')'group name        :: ',g%name
+   write(*,'(A21,I10)')'total individuals :: ',g%Tnind
+   write(*,'(A21,I10)')'assigned slots    :: ',g%nind
+   write(*,'(A21,I10)')'spatial dimension :: ',g%space_dim
+  
+   select case(g%hdiff_type)
+     case(HDIFF_NONE) 
+       write(*,'(A21,A20)')'hdiff type        :: ','HDIFF_NONE'
+     case(HDIFF_CONSTANT) 
+       write(*,'(A21,A20)')'hdiff type        :: ','HDIFF_CONSTANT'
+       write(*,'(A21,F10.6)')'hdiff constant    :: ',g%hdiff_const_val
+     case(HDIFF_VISSER)   
+       write(*,'(A21,A20)')'hdiff type        :: ','HDIFF_VISSER'
+   end select
+   select case(g%vdiff_type)
+     case(VDIFF_NONE) 
+       write(*,'(A21,A20)')'vdiff type        :: ','VDIFF_NONE'
+     case(VDIFF_CONSTANT) 
+       write(*,'(A21,A20)')'vdiff type        :: ','VDIFF_CONSTANT'
+	 write(*,'(A21,A10)')'biology           :: ','ACTIVE'
+     case(VDIFF_VISSER)   
+       write(*,'(A21,A20)')'vdiff type        :: ','VDIFF_VISSER'
+   end select
+   if(g%biology)then
+	 write(*,'(A21,A10)')'biology           :: ','ACTIVE'
+	 write(*,'(A21,F10.2)')'bio time step     :: ',g%DT_bio	 
+   else
+	 write(*,'(A21,A10)')'biology           :: ','INACTIVE'
+   endif
+   write(*,'(A21,F10.2)')'output interval   :: ',g%intvl_out
+   write(*,'(A21,F10.2)')'output starts at  :: ',g%start_out
+   write(*,'(A21,I10)')'num. state vars   :: ',g%nstate
+
    call print_state_vars(g%state)
 
-   
 end subroutine print_group_summary
 
 End Module mod_igroup

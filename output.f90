@@ -29,25 +29,36 @@ contains
 !-------------------------------------------
 ! output driver
 !-------------------------------------------
-subroutine output(ng,g,time)
+subroutine cdf_out(ng,g,time,otype)
   integer, intent(in) :: ng
   type(igroup),intent(inout), dimension(ng) :: g
   real(sp), intent(in) :: time
+  integer,  intent(in) :: OTYPE
   integer :: n
+ 
+  select case(otype)
+  case(NCDO_HEADER)
+    do n=1,ng
+	  write_header(g(n))
+	end do
+  case(NCDO_ADD_STATES)
+    do n=1,ng
+	  call addtocdf_states(g(n))
+	end do
+  case(NCDO_OUTPUT)
+    do n=1,ng
+	  if(time-g(n)%tlast_out) < g(n)%intvl_out .or. time < g(n)%start_out) cycle
+	  call output_group(g(n),time)
+	end do
+  end select
 
-   do n=1,ng
-     if( (time-g(n)%tlast_out) < g(n)%intvl_out .or. time < g(n)%start_out) cycle
-     if(g(n)%frame_out == 0) call write_header(g(n),time)
-     call output_group(g(n),time)
-   end do
-end subroutine output
+end subroutine cdf_out
 
 !-------------------------------------------
 ! write netcdf header
 !-------------------------------------------
-subroutine write_header(g,time)
+subroutine write_header(g)
   type(igroup), intent(inout) :: g
-  real(sp), intent(in) :: time
   character(len=fstr)  :: fname
   character(len=1)     :: num
   integer              :: ierr,fid
@@ -80,14 +91,31 @@ subroutine write_header(g,time)
   call cfcheck( nf90_put_att(fid, time_vid,"long_name","time") )
   call cfcheck( nf90_put_att(fid, time_vid,"units","days") )
 
-  !write the state variables slated for output
-  call write_cdf_header_vars(g%state,fid,dynm2d)
-
   !close the file
   call cfcheck( nf90_close(g%fid_out) )
 
 end subroutine write_header
   
+subroutine addtocdf_states(g)
+type(igroup), intent(inout) :: g
+integer              :: ierr
+
+!open the file
+ierr = nf90_open(g%fname_out,nf90_write,g%fid_out)
+if(ierr /= nf90_noerr)then
+  write(*,*)'error opening', trim(g%fname_out)
+  write(*,*)trim(nf90_strerror(ierr))
+endif
+
+!write the state variables slated for output
+call write_cdf_header_vars(g%state,fid,dynm2d)
+
+!close the file
+call cfcheck( nf90_close(g%fid_out) )
+
+end subroutine addtocdf_states
+
+
 subroutine output_group(g,time)
   type(igroup), intent(inout) :: g
   real(sp), intent(in) :: time

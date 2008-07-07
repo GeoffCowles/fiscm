@@ -71,8 +71,8 @@ function pvar_list_() result(plist)
   integer :: astat
   allocate(plist%begin,stat=astat)
   if(astat /= 0)then
-	write(*,*)'error creating linked list of state variables'
-	stop
+    write(*,*)'error creating linked list of state variables'
+    stop
   endif
   nullify(plist%begin%next)
 end function pvar_list_
@@ -93,8 +93,8 @@ subroutine add_pvar_node(plist,p)
      if(p%istype == ftype)then
        allocate(plst%next%v%fvar(p%idim))
      else if(p%istype == itype)then
-	   allocate(plst%next%v%ivar(p%idim))
-	 endif
+       allocate(plst%next%v%ivar(p%idim))
+     endif
      plst%next%v = p
      nullify(plst%next%next)
      exit
@@ -122,23 +122,22 @@ function get_pvar(plist,vname) result(p)
   plst => plist%begin
   pnew => plst%next
   if(.not.associated(plst%next))then
-	write(*,*)'plist has no nodes'
-	stop
+    write(*,*)'plist has no nodes'
+    stop
   endif
-	
   
   
   do 
-	if(.not.associated(plst%next)) exit
-	
-	if(pnew%v%varname == vname)then
+    if(.not.associated(plst%next)) exit
+
+    if(pnew%v%varname == vname)then
       p => plst%next%v
       found = .true.
       exit
-	else
-	  plst => pnew
-	  pnew => pnew%next
-	endif
+    else
+      plst => pnew
+      pnew => pnew%next
+    endif
 
   end do
 
@@ -158,19 +157,19 @@ subroutine print_state_vars(plist)
   pnew => plst%next
 
   if(.not.associated(plst%next))then
-	write(*,*)'plist has no nodes'
-	stop
+    write(*,*)'plist has no nodes'
+    stop
   endif
   write(*,*)'-----------------------------------------------------------------'
   write(*,*)'state variable|          long name           | units'
   write(*,*)'-----------------------------------------------------------------'
-	
+
   do 
-	if(.not.associated(plst%next)) exit
-	
-	write(*,'(A15,A1,A30,A1,A30)')pnew%v%varname,'|',pnew%v%longname,'|',pnew%v%units
+    if(.not.associated(plst%next)) exit
+
+    write(*,'(A15,A1,A30,A1,A30)')pnew%v%varname,'|',pnew%v%longname,'|',pnew%v%units
     plst => pnew
-	pnew => pnew%next
+    pnew => pnew%next
   end do
 
 end subroutine print_state_vars
@@ -187,46 +186,46 @@ subroutine write_cdf_header_vars(plist,fid,dims)
   pnew => plst%next
 
   if(.not.associated(plst%next))then
-	write(*,*)'plist has no nodes'
-	stop
+    write(*,*)'plist has no nodes'
+    stop
   endif
   do 
-	if(.not.associated(plst%next)) exit
-	  !dump the header if user selected to dump
-   	  if(pnew%v%output == NETCDF_YES)then
-	    dum => pnew%v
-	    select case(dum%istype)
-	    case(ftype)
+    if(.not.associated(plst%next)) exit
+      !dump the header if user selected to dump
+         if(pnew%v%output == NETCDF_YES)then
+        dum => pnew%v
+        select case(dum%istype)
+        case(ftype)
           ierr = nf90_def_var(fid,dum%varname,nf90_float,dims,dum%nc_vid)
           if(ierr /= nf90_noerr) then
-	        write(*,*)'error defining netcdf header for variable: ',dum%varname
-		    write(*,*)trim(nf90_strerror(ierr)) ; stop 
-		  end if
+            write(*,*)'error defining netcdf header for variable: ',dum%varname
+            write(*,*)trim(nf90_strerror(ierr)) ; stop 
+          end if
         case(itype)
           ierr = nf90_def_var(fid,dum%varname,nf90_int  ,dims,dum%nc_vid)
           if(ierr /= nf90_noerr) then
-	        write(*,*)'error defining netcdf header for variable: ',dum%varname
-		    write(*,*)trim(nf90_strerror(ierr)) ; stop 
-		  end if
+            write(*,*)'error defining netcdf header for variable: ',dum%varname
+            write(*,*)trim(nf90_strerror(ierr)) ; stop 
+          end if
         case default
           write(*,*)'not setup for netcdf dumping state variable of type:',dum%istype
           stop
         end select
-		ierr = nf90_put_att(fid,dum%nc_vid,"long_name",dum%longname)
-		if(ierr /= nf90_noerr) then
-	        write(*,*)'error defining netcdf header for variable: ',dum%varname
-		    write(*,*)trim(nf90_strerror(ierr)) ; stop 
-		end if
-		
-		ierr = nf90_put_att(fid,dum%nc_vid,"units",dum%units)
-		if(ierr /= nf90_noerr) then
-	        write(*,*)'error defining netcdf header for variable: ',dum%varname
-		    write(*,*)trim(nf90_strerror(ierr)) ; stop 
-		end if
-	  endif
-	
+        ierr = nf90_put_att(fid,dum%nc_vid,"long_name",dum%longname)
+        if(ierr /= nf90_noerr) then
+          write(*,*)'error defining netcdf header for variable: ',dum%varname
+          write(*,*)trim(nf90_strerror(ierr)) ; stop 
+        end if
+
+        ierr = nf90_put_att(fid,dum%nc_vid,"units",dum%units)
+        if(ierr /= nf90_noerr) then
+           write(*,*)'error defining netcdf header for variable: ',dum%varname
+            write(*,*)trim(nf90_strerror(ierr)) ; stop 
+        end if
+      endif
+
     plst => pnew
-	pnew => pnew%next
+    pnew => pnew%next
   end do
 
 end subroutine write_cdf_header_vars
@@ -251,31 +250,31 @@ subroutine write_cdf_data(plist,fid,frame)
 	stop
   endif
   do 
-	if(.not.associated(plst%next)) exit
-	  !dump the variable if user selected to dump
-   	  if(pnew%v%output == NETCDF_YES)then
-	    dum => pnew%v
-	    select case(dum%istype)
-	    case(ftype)
-	      ierr = nf90_put_var(fid, dum%nc_vid, dum%fvar,START=dims)
+    if(.not.associated(plst%next)) exit
+      !dump the variable if user selected to dump
+      if(pnew%v%output == NETCDF_YES)then
+        dum => pnew%v
+        select case(dum%istype)
+        case(ftype)
+          ierr = nf90_put_var(fid, dum%nc_vid, dum%fvar,START=dims)
           if(ierr /= nf90_noerr) then
-	        write(*,*)'error dumping frame for variable: ',dum%varname
-		    write(*,*)trim(nf90_strerror(ierr)) ; stop 
-		  end if
+            write(*,*)'error dumping frame for variable: ',dum%varname
+            write(*,*)trim(nf90_strerror(ierr)) ; stop 
+          end if
         case(itype)
-		  ierr = nf90_put_var(fid, dum%nc_vid, dum%ivar,START=dims)
+          ierr = nf90_put_var(fid, dum%nc_vid, dum%ivar,START=dims)
           if(ierr /= nf90_noerr) then
-	        write(*,*)'error dumping frame for variable: ',dum%varname
-		    write(*,*)trim(nf90_strerror(ierr)) ; stop 
-		  end if
+             write(*,*)'error dumping frame for variable: ',dum%varname
+             write(*,*)trim(nf90_strerror(ierr)) ; stop 
+          end if
         case default
           write(*,*)'not setup for netcdf dumping state variable of type:',dum%istype
           stop
         end select
-	
-	  endif
+
+      endif
     plst => pnew
-	pnew => pnew%next
+    pnew => pnew%next
   end do
 end subroutine write_cdf_data
   
