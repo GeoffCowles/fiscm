@@ -1,13 +1,14 @@
  &NML_FISCM
  beg_time        = 0.0 ,
- end_time        = 1728000.,
+ end_time        = 20.0,     
  deltaT          = 3600.,
- ngroups         = 2
+ ngroups         = 1
+ forcing_file    = 'NONE'
  /
 
 
  &NML_GROUP
- Tnind            = 5,
+ Tnind            = 1,
  space_dim        = 0,
  group_name       = 'the first group',
  hdiff_type       = 1,
@@ -18,7 +19,25 @@
  biology          = T,
  intvl_out        = 7200.,
  start_out        = 0.0,
- statefile        = 'lobster.nml'
+ statefile        = 'lobster.nml',
+ paramfile        = 'test1.nml',
+ nstate           = 4
+/
+
+ &NML_GROUP
+ Tnind            = 6,
+ space_dim        = 0,
+ group_name       = 'the new group',
+ hdiff_type       = 1,
+ hdiff_const_val  = 20.,
+ vdiff_type       = 0,
+ vdiff_const_val  = 0.0,
+ DT_bio           = 7200.,
+ biology          = T,
+ intvl_out        = 7200.,
+ start_out        = 0.0,
+ statefile        = 'lobster.nml',
+ paramfile        = 'test2.nml',
  nstate           = 4
 /
 
@@ -34,7 +53,8 @@
  biology          = F,
  intvl_out        = 7200.,
  start_out        = 0.0,
- statefile        = 'NONE' 
+ statefile        = 'NONE',
+ paramfile        = 'NONE',
  nstate           = 0
 /
 

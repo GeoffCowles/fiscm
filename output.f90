@@ -26,7 +26,14 @@ integer, private  :: dynm1d(1)
 
 public
 
+interface add_cdfglobs
+  module procedure add_cdfglobs_int
+  module procedure add_cdfglobs_flt
+  module procedure add_cdfglobs_str
+end interface
+
 contains
+
 !-------------------------------------------
 ! output driver
 !-------------------------------------------
@@ -78,6 +85,7 @@ subroutine write_header(g)
   !global attributes
   call cfcheck( nf90_put_att(fid,nf90_global,"code"      ,"FISCM") )
   call cfcheck( nf90_put_att(fid,nf90_global,"group"     ,g%id) )
+  call cfcheck( nf90_put_att(fid,nf90_global,"DT_bio"    ,g%DT_bio) )
 
   !write the dimensions (time, number of individuals)
   call cfcheck(nf90_def_dim(fid,"nlag",g%Tnind       , nlag_did) )
@@ -97,6 +105,9 @@ subroutine write_header(g)
 
 end subroutine write_header
   
+!-----------------------------------------------
+! add state variable definitions to netcdf file
+!-----------------------------------------------
 subroutine addtocdf_states(g)
 type(igroup), intent(inout) :: g
 integer              :: ierr
@@ -107,6 +118,7 @@ if(ierr /= nf90_noerr)then
   write(*,*)'error opening', trim(g%fname_out)
   write(*,*)trim(nf90_strerror(ierr))
 endif
+call cfcheck( nf90_redef(g%fid_out) )
 
 !write the state variables slated for output
 call write_cdf_header_vars(g%state,g%fid_out,dynm2d)
@@ -116,7 +128,88 @@ call cfcheck( nf90_close(g%fid_out) )
 
 end subroutine addtocdf_states
 
+!-----------------------------------------------
+! add additional parameters to netcdf global
+! parameter list -- FLOATS
+!-----------------------------------------------
+subroutine add_cdfglobs_flt(g,desc,val)
+type(igroup), intent(inout) :: g
+character(len=*)     :: desc
+real(sp), intent(in) :: val
+integer              :: ierr
 
+!open the file
+ierr = nf90_open(g%fname_out,nf90_write,g%fid_out)
+if(ierr /= nf90_noerr)then
+  write(*,*)'error opening', trim(g%fname_out)
+  write(*,*)trim(nf90_strerror(ierr))
+endif
+call cfcheck( nf90_redef(g%fid_out) )
+
+!write variable to global
+  call cfcheck( nf90_put_att(g%fid_out,nf90_global,trim(desc),val) )
+
+!close the file
+call cfcheck( nf90_close(g%fid_out) )
+
+end subroutine add_cdfglobs_flt
+
+!-----------------------------------------------
+! add additional parameters to netcdf global
+! parameter list -- INTEGERS
+!-----------------------------------------------
+subroutine add_cdfglobs_int(g,desc,val)
+type(igroup), intent(inout) :: g
+character(len=*)     :: desc
+integer , intent(in) :: val
+integer              :: ierr
+
+!open the file
+ierr = nf90_open(g%fname_out,nf90_write,g%fid_out)
+if(ierr /= nf90_noerr)then
+  write(*,*)'error opening', trim(g%fname_out)
+  write(*,*)trim(nf90_strerror(ierr))
+endif
+call cfcheck( nf90_redef(g%fid_out) )
+
+!write variable to global
+  call cfcheck( nf90_put_att(g%fid_out,nf90_global,trim(desc),val) )
+
+!close the file
+call cfcheck( nf90_close(g%fid_out) )
+
+end subroutine add_cdfglobs_int
+
+!-----------------------------------------------
+! add additional parameters to netcdf global
+! parameter list -- STRINGS
+!-----------------------------------------------
+subroutine add_cdfglobs_str(g,desc,val)
+type(igroup), intent(inout) :: g
+character(len=*)     :: desc
+character(len=*)     :: val
+integer              :: ierr
+
+!open the file
+ierr = nf90_open(g%fname_out,nf90_write,g%fid_out)
+if(ierr /= nf90_noerr)then
+  write(*,*)'error opening', trim(g%fname_out)
+  write(*,*)trim(nf90_strerror(ierr))
+endif
+call cfcheck( nf90_redef(g%fid_out) )
+
+!write variable to global
+  call cfcheck( nf90_put_att(g%fid_out,nf90_global,trim(desc),val) )
+
+!close the file
+call cfcheck( nf90_close(g%fid_out) )
+
+end subroutine add_cdfglobs_str
+
+!-----------------------------------------------
+! output time dependent vars (states and time) 
+! to netcdf files
+!-----------------------------------------------
 subroutine output_group(g,time)
   type(igroup), intent(inout) :: g
   real(sp), intent(in) :: time

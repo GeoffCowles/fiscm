@@ -35,7 +35,7 @@ type pvar
   character(len=sstr) :: varname
   character(len=cstr) :: longname
   character(len=cstr) :: units
-  character(len=cstr) :: from_extern_var
+  character(len=cstr) :: from_ext_var
   integer             :: output
   integer             :: nc_vid
 !  switch to allocatable type components when gfortran 4.2+ 
@@ -160,14 +160,14 @@ subroutine print_state_vars(plist)
     write(*,*)'plist has no nodes'
     stop
   endif
-  write(*,*)'-----------------------------------------------------------------'
-  write(*,*)'state variable|          long name           | units'
-  write(*,*)'-----------------------------------------------------------------'
+  write(*,*)'----------------------------------------------------------------------'
+  write(*,*)'state variable|          long name           | units    | external var'
+  write(*,*)'----------------------------------------------------------------------'
 
   do 
     if(.not.associated(plst%next)) exit
 
-    write(*,'(A15,A1,A30,A1,A30)')pnew%v%varname,'|',pnew%v%longname,'|',pnew%v%units
+    write(*,'(A15,A1,A30,A1,A10,A1,A30)')pnew%v%varname,'|',pnew%v%longname,'|',pnew%v%units,'|',pnew%v%from_ext_var
     plst => pnew
     pnew => pnew%next
   end do

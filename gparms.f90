@@ -17,10 +17,10 @@ Module Gparms
 Implicit None
 
 !single precision kind 
-integer, parameter :: sp = selected_real_kind(6 , 37)
+!integer, parameter :: sp = selected_real_kind(6 , 37)
 
 !double precision kind
-!integer, parameter :: sp = selected_real_kind(15,307)
+integer, parameter :: sp = selected_real_kind(15,307)
 
 !double precision constants
 real(sp), parameter :: an8th = 0.125_sp
@@ -43,9 +43,17 @@ integer, parameter  :: tstr = 120
 integer, parameter  :: vstr = 30    
 integer, parameter  :: sstr = 15   
 integer, parameter  :: cstr = 30 
+!----------------------------------------------------------------
+!time
+!     day_2_sec:    convert days to seconds 
+!     sec_2_day:    convert seconds to days 
+!----------------------------------------------------------------
+
+real(sp), parameter :: day_2_sec = 86400. 
+real(sp), parameter :: sec_2_day = one/day_2_sec 
 
 !----------------------------------------------------------------
-!trigonemetric
+!trigonometric
 !      pi:    pi
 !     d2r:    convert degrees to radians
 !     r2d:    convert radians to degrees

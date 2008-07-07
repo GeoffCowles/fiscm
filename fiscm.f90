@@ -9,11 +9,6 @@
 ! THIS ORIGINAL HEADER MUST BE MAINTAINED IN ALL DISTRIBUTED
 ! VERSIONS.
 !
-! Major Todos:
-!    1.) migrate to D.S. netcdf libraries
-!    2.) migrate to D.S. time type
-!    3.) openmp doloops to multithread heavier sections 
-!        parallel random number generator?
 !=======================================================================
 Module fiscm_data
   use gparms
@@ -24,12 +19,14 @@ Module fiscm_data
   real(sp) :: deltaT
   integer  :: sim_direction
   integer  :: ngroups
+  character(len=fstr) :: forcing_file
 
   Namelist /NML_FISCM/ &
-     & beg_time,       & 
-     & end_time,       &
-     & deltaT,  &
-     & Ngroups 
+      beg_time,       & 
+      end_time,       &
+      deltaT,         &
+      Ngroups,        &
+      forcing_file
   
 End Module fiscm_data
 
@@ -40,7 +37,10 @@ Program fiscm
   use mod_AD
   use bio
   use output_routines
+  use forcing
+  implicit none
   integer :: i,n
+  real(sp):: t = 0.0
 
   !---------------------------------------------------
   ! read primary simulation data and setup groups
@@ -50,18 +50,28 @@ Program fiscm
   !---------------------------------------------------
   ! initialize groups and data
   !---------------------------------------------------
-  call init_bio(igroups(1),igroups(1)%Tnind)
+  do n=1,ngroups
+    if(igroups(n)%biology)call init_bio(igroups(n),igroups(n)%Tnind)
+  end do
 
   !---------------------------------------------------
   ! define variables for output
   !---------------------------------------------------
-  call cdf_out(ngroups,igroups,0.0,NCDO_ADD_STATES)
+  call cdf_out(ngroups,igroups,t,NCDO_ADD_STATES)
 
   !---------------------------------------------------
   ! setup and simulation summary
   !---------------------------------------------------
   do n=1,ngroups
     call print_group_summary(igroups(n))
+  end do
+
+  !---------------------------------------------------
+  ! open input file
+  ! ensure input file contains necessary data
+  !---------------------------------------------------
+  do n=1,ngroups
+    call check_forcing(igroups(n),forcing_file,beg_time,end_time,sim_direction)
   end do
 
   !---------------------------------------------------
@@ -77,6 +87,12 @@ Program fiscm
     end do
 
     call cdf_out(ngroups,igroups,t,NCDO_OUTPUT)
+
+    if(.not. checkstatus(ngroups,igroups,t))then
+      write(*,*)'no active particles left in the simulation'
+      write(*,*)'shutting down prematurely'
+      exit
+    endif
 
     t = t + deltaT
   end do
@@ -98,6 +114,8 @@ Subroutine setup
   logical :: fexist
   integer, parameter :: iunit = 33
   integer :: n,ios
+  real(sp) :: uno = 1.0
+  real(sp) :: t   = 0.0
 
   !--------------------------------------------------------
   ! check for existence of primary control file
@@ -120,17 +138,20 @@ Subroutine setup
   endif
 
   if(end_time /= beg_time)then
-    sim_direction = sign(1., end_time-beg_time)
+    sim_direction = sign(uno, end_time-beg_time)
   else
     write(*,*)'fatal error: begin and end time are identical'
     stop
   endif
 
+  !convert time step to days
+  deltaT = deltaT*sec_2_day
+
   write(*,*)'begin time:  ',beg_time
   write(*,*)'end time  :  ',end_time
   if(sim_direction ==  1)  write(*,*)'direction:      forward'
   if(sim_direction == -1)  write(*,*)'direction:      backward'
-  write(*,*)'time step:   ',deltaT
+  write(*,*)'time step(s) ',deltaT*day_2_sec
   write(*,*)'num groups:  ',ngroups
 
   !read and allocate individual groups
@@ -140,7 +161,6 @@ Subroutine setup
   end do
 
   !open output files and assign netcdf ids to each group
-  call cdf_out(ngroups,igroups,0.0,NCDO_HEADER)
+  call cdf_out(ngroups,igroups,t,NCDO_HEADER)
   
-
 End Subroutine setup
