@@ -53,6 +53,11 @@ Program fiscm
   call init_bio(igroups(1),igroups(1)%Tnind)
 
   !---------------------------------------------------
+  ! define variables for output
+  !---------------------------------------------------
+  call cdf_out(ngroups,igroups,0.0,NCDO_ADD_STATES)
+
+  !---------------------------------------------------
   ! setup and simulation summary
   !---------------------------------------------------
   do n=1,ngroups
@@ -64,14 +69,14 @@ Program fiscm
   !---------------------------------------------------
   t = beg_time
   do while (t <= end_time)
-	
-	call adv_diff(ngroups,igroups,t)
-	
-	do n=1,ngroups
+
+    call adv_diff(ngroups,igroups,t)
+
+    do n=1,ngroups
       if(igroups(n)%biology)call advance_bio(igroups(n),t)
     end do
 
-    call output(ngroups,igroups,t)
+    call cdf_out(ngroups,igroups,t,NCDO_OUTPUT)
 
     t = t + deltaT
   end do
@@ -88,6 +93,7 @@ Subroutine setup
   use gparms
   use fiscm_data
   use mod_igroup
+  use output_routines
   implicit none
   logical :: fexist
   integer, parameter :: iunit = 33

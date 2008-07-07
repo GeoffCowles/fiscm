@@ -24,6 +24,7 @@ integer, private  ::  time_vid
 integer, private  :: dynm2d(2)
 integer, private  :: dynm1d(1)
 
+public
 
 contains
 !-------------------------------------------
@@ -39,7 +40,7 @@ subroutine cdf_out(ng,g,time,otype)
   select case(otype)
   case(NCDO_HEADER)
     do n=1,ng
-	  write_header(g(n))
+	  call write_header(g(n))
 	end do
   case(NCDO_ADD_STATES)
     do n=1,ng
@@ -47,7 +48,7 @@ subroutine cdf_out(ng,g,time,otype)
 	end do
   case(NCDO_OUTPUT)
     do n=1,ng
-	  if(time-g(n)%tlast_out) < g(n)%intvl_out .or. time < g(n)%start_out) cycle
+	  if( (time-g(n)%tlast_out) < g(n)%intvl_out .or. time < g(n)%start_out) cycle
 	  call output_group(g(n),time)
 	end do
   end select
@@ -108,7 +109,7 @@ if(ierr /= nf90_noerr)then
 endif
 
 !write the state variables slated for output
-call write_cdf_header_vars(g%state,fid,dynm2d)
+call write_cdf_header_vars(g%state,g%fid_out,dynm2d)
 
 !close the file
 call cfcheck( nf90_close(g%fid_out) )
