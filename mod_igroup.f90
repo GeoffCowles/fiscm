@@ -423,7 +423,7 @@ function checkstatus(ng,g,time) result(validsim)
      deallocate(mark)
      nTOTAL = nTOTAL + NI 
    end do
-   write(*,*)time,nTOTAL,nSETTLED,nDEAD,nACTIVE,nEXITED,nUNKNOWN
+!   write(*,*)time,nTOTAL,nSETTLED,nDEAD,nACTIVE,nEXITED,nUNKNOWN
 
    if(nACTIVE == 0) validsim = .false.
 

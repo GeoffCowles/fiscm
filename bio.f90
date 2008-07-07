@@ -120,8 +120,10 @@ subroutine advance_bio(g,mtime)
     select case (stage(i))
     case(1)
       D = 851.*(T(i)-0.84)**(-1.91)
+      write(*,*)'stage 1 duration: ',D,deltaT,PASD(i)
     case(2)
       D = 200*(T(i)-4.88)**(-1.47)
+      write(*,*)'stage 2 duration: ',D,deltaT
     case(3)
       D = 252*(T(i)-5.30)**(1.45)
     case(4)
@@ -133,7 +135,7 @@ subroutine advance_bio(g,mtime)
       stop
     end select
 
-    PASD(i) = PASD(i) + SCF*deltaT*D
+    PASD(i) = PASD(i) + SCF*deltaT/D
 
     !settle the post-larvae 
     if(stage(i)==4 .and. PASD(i) > fcomp_settle)then
