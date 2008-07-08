@@ -1,0 +1,41 @@
+ &NML_STATEVAR
+ state_varname          = 'stage',
+ state_longname         = 'stage',
+ state_units            = '-',
+ state_netcdf_out       = 1,
+ state_vartype          = 1,
+ state_initval_int      = 1,
+ state_initval_flt      = 0.0,
+ state_from_ext_var     = 'NONE' 
+/
+
+ &NML_STATEVAR
+ state_varname          = 'PASD',
+ state_longname         = 'Model Currency',
+ state_units            = '-',
+ state_netcdf_out       = 1,
+ state_vartype          = 2,
+ state_initval_int      = 1,
+ state_initval_flt      = 0.0,
+ state_from_ext_var     = 'NONE'
+/
+ &NML_STATEVAR
+ state_varname          = 'T',
+ state_longname         = 'temperature',
+ state_units            = 'C',
+ state_netcdf_out       = 1,
+ state_vartype          = 2,
+ state_initval_int      = 1,
+ state_initval_flt      = 12.0,
+ state_from_ext_var     = 'temp'
+/
+ &NML_STATEVAR
+ state_varname          = 'N',
+ state_longname         = 'number of individuals',
+ state_units            = '-',
+ state_netcdf_out       = 1,
+ state_vartype          = 1,
+ state_initval_int      = 50000,
+ state_initval_flt      = 0.0,
+ state_from_ext_var     = 'NONE' 
+/

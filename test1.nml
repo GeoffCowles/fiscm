@@ -1,0 +1,4 @@
+ &NML_LOBSTER 
+ fcomp_settle           = 0.5,
+ SCF                    = 0.4
+/
