@@ -84,8 +84,13 @@ end subroutine init_bio
 !------------------------------------------------------------------
 ! advance the biology (this routine is called from the main loop at
 !                      a time interval of DT_bio )
+! use temperature-stage dependence from 
+!
+!     Incze, L.S., Naimie, C., 2000. Modeling the transport of lobster
+!      (homarus americanus) larvae and postlarvae in the Gulf of
+!      Maine. Fish. Oceanogr. 9, 99-113. 
 !------------------------------------------------------------------
-subroutine advance_bio(g,mtime)
+subroutine advance_bio(g,mtime)  
   type(igroup), intent(inout) :: g
   real(sp),     intent(in   ) :: mtime
   real(sp),     pointer :: PASD(:)
@@ -103,7 +108,7 @@ subroutine advance_bio(g,mtime)
   
   !set problem size
   N = g%nind
-  deltaT = g%DT_bio
+  deltaT = g%DT_bio*sec_2_day !time step in days 
 
 !  following interface is cleaner but compiler cannot construct
 !  generic interface if arguments are the same even if the
@@ -120,12 +125,10 @@ subroutine advance_bio(g,mtime)
     select case (stage(i))
     case(1)
       D = 851.*(T(i)-0.84)**(-1.91)
-      write(*,*)'stage 1 duration: ',D,deltaT,PASD(i)
     case(2)
       D = 200*(T(i)-4.88)**(-1.47)
-      write(*,*)'stage 2 duration: ',D,deltaT
     case(3)
-      D = 252*(T(i)-5.30)**(1.45)
+      D = 252*(T(i)-5.30)**(-1.54)
     case(4)
       D = .3583*T(i)**2 - 14.316*T(i) + 156.895
     case(5)
@@ -135,7 +138,7 @@ subroutine advance_bio(g,mtime)
       stop
     end select
 
-    PASD(i) = PASD(i) + SCF*deltaT/D
+    PASD(i) = PASD(i) + deltaT/(D*SCF)
 
     !settle the post-larvae 
     if(stage(i)==4 .and. PASD(i) > fcomp_settle)then

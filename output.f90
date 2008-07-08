@@ -37,27 +37,27 @@ contains
 !-------------------------------------------
 ! output driver
 !-------------------------------------------
-subroutine cdf_out(ng,g,time,otype)
+subroutine cdf_out(ng,g,itnum,time,otype)
   integer, intent(in) :: ng
   type(igroup),intent(inout), dimension(ng) :: g
-  real(sp), intent(in) :: time
+  integer , intent(in) :: itnum
+  real(sp), intent(in) :: time 
   integer,  intent(in) :: OTYPE
   integer :: n
  
   select case(otype)
   case(NCDO_HEADER)
     do n=1,ng
-	  call write_header(g(n))
-	end do
+      call write_header(g(n))
+    end do
   case(NCDO_ADD_STATES)
     do n=1,ng
-	  call addtocdf_states(g(n))
-	end do
+      call addtocdf_states(g(n))
+    end do
   case(NCDO_OUTPUT)
     do n=1,ng
-	  if( (time-g(n)%tlast_out) < g(n)%intvl_out .or. time < g(n)%start_out) cycle
-	  call output_group(g(n),time)
-	end do
+      if(mod(itnum-1,g(n)%intvl_out)==0)call output_group(g(n),time)
+    end do
   end select
 
 end subroutine cdf_out

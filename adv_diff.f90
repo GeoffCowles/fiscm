@@ -22,10 +22,9 @@ contains
 !----------------------------------------------------
 ! advection-diffusion driver
 !----------------------------------------------------
-subroutine adv_diff(ng,g,time)
+subroutine adv_diff(ng,g)
   integer     , intent(in   ) :: ng
   type(igroup), intent(inout), dimension(ng) :: g
-  real(sp)    , intent(in   ) :: time
   integer :: n
   do n=1,ng
 

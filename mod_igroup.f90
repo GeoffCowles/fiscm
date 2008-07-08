@@ -23,8 +23,9 @@ Implicit None
 !group - for i/o
 integer  :: Tnind,nind,space_dim,nstate
 integer  :: hdiff_type,vdiff_type
-real(sp) :: DT_bio
-real(sp) :: tlast_out,start_out,intvl_out
+integer  :: intvl_out
+integer  :: intvl_bio
+real(sp) :: tlast_out,start_out
 real(sp) :: group_deltat
 real(sp) :: hdiff_const_val,vdiff_const_val
 logical  :: biology
@@ -39,7 +40,7 @@ Namelist /NML_GROUP/     &
    & hdiff_const_val,    &
    & vdiff_type,         &
    & vdiff_const_val,    &
-   & DT_bio,             &
+   & intvl_bio,          &
    & biology,            &
    & intvl_out,          &
    & start_out,          &
@@ -77,9 +78,10 @@ type igroup
   real(sp)            :: vdiff_const_val
   integer             :: hdiff_type
   integer             :: vdiff_type
-  real(sp)            :: DT_bio       !time step for biology
+  integer             :: intvl_bio
+  real(sp)            :: DT_bio
   logical             :: biology
-  real(sp)            :: intvl_out
+  integer             :: intvl_out
   real(sp)            :: tlast_out
   real(sp)            :: start_out
   integer             :: frame_out
@@ -105,10 +107,11 @@ contains
 !Create the initial group type (passive particle)
 !---------------------------------------------------------
 !function group_(i,id,bio) result (g)
-function group_(fid,id) result(g)
+function group_(fid,id,deltaT) result(g)
   type(igroup) :: g
   integer, intent(in) :: fid
   integer, intent(in) :: id
+  real(sp),intent(in) :: deltaT
   integer :: ios,i,ns
   logical :: fexist
   real(sp) :: fval
@@ -132,9 +135,9 @@ function group_(fid,id) result(g)
     stop
   endif
 
-  !convert time step to days
-  DT_bio = DT_bio*sec_2_day
-  intvl_out = intvl_out*sec_2_day
+  !set time step
+  g%DT_bio = intvl_bio*deltaT
+
 
   g%id     = id           
   g%Tnind  = Tnind   
@@ -145,7 +148,7 @@ function group_(fid,id) result(g)
   g%hdiff_const_val = hdiff_const_val
   g%vdiff_type = vdiff_type
   g%vdiff_const_val = vdiff_const_val
-  g%DT_bio = DT_bio 
+  g%intvl_bio = intvl_bio
   g%biology = biology
   g%intvl_out = intvl_out
   g%tlast_out = 0.0
@@ -358,11 +361,11 @@ subroutine print_group_summary(g)
    end select
    if(g%biology)then
      write(*,'(A21,A10)')'biology           :: ','ACTIVE'
-     write(*,'(A21,F10.2)')'bio time step(s)  :: ',g%DT_bio*day_2_sec
+     write(*,'(A21,F10.2)')'bio time step(s)  :: ',g%DT_bio
    else
      write(*,'(A21,A10)')'biology           :: ','INACTIVE'
    endif
-   write(*,'(A21,F10.2)')'output interval(s):: ',g%intvl_out*day_2_sec
+   write(*,'(A21,I10)')'output interval(its):: ',g%intvl_out
    write(*,'(A21,F10.2)')'output starts at  :: ',g%start_out
    write(*,'(A21,I10)')'num. state vars   :: ',g%nstate
 
@@ -375,6 +378,7 @@ end subroutine print_group_summary
 ! no active particles left
 !---------------------------------------------------------
 function checkstatus(ng,g,time) result(validsim)
+   use utilities
    implicit none
    logical :: validsim 
    integer, intent(in)     :: ng
@@ -389,6 +393,7 @@ function checkstatus(ng,g,time) result(validsim)
    integer, pointer :: istatus(:)
    integer :: n,NI
    integer, allocatable :: mark(:)
+   integer, save :: dumphead = 0
 
    !assume we still have some active particles
    validsim = .true.
@@ -423,9 +428,19 @@ function checkstatus(ng,g,time) result(validsim)
      deallocate(mark)
      nTOTAL = nTOTAL + NI 
    end do
-!   write(*,*)time,nTOTAL,nSETTLED,nDEAD,nACTIVE,nEXITED,nUNKNOWN
+   dumphead = dumphead + 1
+   if(mod(dumphead-1,15)==0)then
+     write(*,102)
+     dumphead = 1
+   endif
+   write(*,101)gettime(int(time)),nTOTAL,nSETTLED,nDEAD,nACTIVE,nEXITED,nUNKNOWN
+
 
    if(nACTIVE == 0) validsim = .false.
+
+  
+ 101 format(A13,1X,I8,1X,I8,1X,I8,1X,I8,1X,I8,1X,I8) 
+ 102 format("   simtime   ",5x," TOTAL  ",1x,"SETTLED",1x,"  DEAD  ",1X," ACTIVE ",1X," EXITED ",1x," UNKNOWN") 
 
 end function checkstatus
 
