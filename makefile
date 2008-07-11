@@ -17,7 +17,7 @@
 #             IOLIBS       =  -L/hosts/salmon01/data00/medm/lib  -lnetcdf
 #             IOINCS       =  -I/hosts/salmon01/data00/medm/include
 
-#          --- following for ade.whoi.edu ----
+#          --- following for ade.whoi.edu (rji)----
              IOLIBS       =  -L/usr/local/lib  -lnetcdf
              IOINCS       =  -I/usr/local/include
 
