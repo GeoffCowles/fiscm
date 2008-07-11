@@ -3,7 +3,7 @@
             DEF_FLAGS     = -P -C -traditional 
             EXEC          = fiscm 
 #--------------------------------------------------------------------------
-#        NETCDF OUTPUT      NEED NETCDF 3.x 
+##        NETCDF OUTPUT      NEED NETCDF 3.x 
 #                           NEED FORTRAN90 INTERFACE
 #                           IOLIBS - PATH TO libnetcdf.a
 #                           IOINCS - PATH TO netcdf.mod
