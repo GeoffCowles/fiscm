@@ -10,12 +10,17 @@
 #--------------------------------------------------------------------------
 
 #          --- following for oscar/rudy ----
-	  IOLIBS       =  /usr/local/netcdf/gfortran/lib/libnetcdf.la
-          IOINCS       =  -I/usr/local/netcdf/gfortran/include
+#	  IOLIBS       =  /usr/local/netcdf/gfortran/lib/libnetcdf.la
+#          IOINCS       =  -I/usr/local/netcdf/gfortran/include
 
 #          --- following for minke ----
 #             IOLIBS       =  -L/hosts/salmon01/data00/medm/lib  -lnetcdf
 #             IOINCS       =  -I/hosts/salmon01/data00/medm/include
+
+#          --- following for ade.whoi.ed ----
+             IOLIBS       =  -L/usr/local/lib  -lnetcdf
+             IOINCS       =  -I/usr/local/include
+
 
 
 #--------------------------------------------------------------------------
@@ -30,21 +35,21 @@
 #--------------------------------------------------------------------------
 # APPLE / gfortran 
 #--------------------------------------------------------------------------
-         CPPFLAGS = $(DEF_FLAGS)
-         CPP      = /usr/bin/cpp
-         FC       = gfortran #-funderscoring # -fno-second-underscore
-         FLINK    = /bin/sh /usr/local/netcdf/gfortran/bin/libtool  --mode=link gfortran
-         DEBFLGS  = 
-         OPT      = 
+#         CPPFLAGS = $(DEF_FLAGS)
+#         CPP      = /usr/bin/cpp
+#         FC       = gfortran #-funderscoring # -fno-second-underscore
+#         FLINK    = /bin/sh /usr/local/netcdf/gfortran/bin/libtool  --mode=link gfortran
+#         DEBFLGS  = 
+#         OPT      = 
 #--------------------------------------------------------------------------
 # LINUX / ifort 
 #--------------------------------------------------------------------------
-#        CPPFLAGS = $(DEF_FLAGS)
-#         CPP      = /usr/bin/cpp
-#         FC       = ifort #-funderscoring # -fno-second-underscore
-#         FLINK    = $(FC) 
-#         DEBFLGS  =
-#         OPT      =
+        CPPFLAGS = $(DEF_FLAGS)
+         CPP      = /usr/bin/cpp
+         FC       = ifort #-funderscoring # -fno-second-underscore
+         FLINK    = $(FC) 
+         DEBFLGS  =
+         OPT      =
 
 #==========================================================================
 #  END USER DEFINITION SECTION
