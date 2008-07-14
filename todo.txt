@@ -6,3 +6,7 @@ add advection/diffusion
 
 add new routine to open the netcdf output files so that init_bio can dump
 global vars to it.
+
+
+ji add 
+
