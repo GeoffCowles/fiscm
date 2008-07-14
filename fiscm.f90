@@ -42,7 +42,7 @@ Program fiscm
   integer :: i,n,its,nits
   real(sp):: t = 0
 
-  !---------------------------------------------------
+  !!---------------------------------------------------
   ! read primary simulation data and setup groups
   !---------------------------------------------------
   call setup
