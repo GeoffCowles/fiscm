@@ -2,55 +2,10 @@
             SHELL         = /bin/sh
             DEF_FLAGS     = -P -C -traditional 
             EXEC          = fiscm 
-#--------------------------------------------------------------------------
-##        NETCDF OUTPUT      NEED NETCDF 3.x 
-#                           NEED FORTRAN90 INTERFACE
-#                           IOLIBS - PATH TO libnetcdf.a
-#                           IOINCS - PATH TO netcdf.mod
-#--------------------------------------------------------------------------
-
-#          --- following for oscar/rudy ----
-	  IOLIBS       =  /usr/local/netcdf/gfortran/lib/libnetcdf.la
-         IOINCS       =  -I/usr/local/netcdf/gfortran/include
-
-#          --- following for minke ----
-#             IOLIBS       =  -L/hosts/salmon01/data00/medm/lib  -lnetcdf
-#             IOINCS       =  -I/hosts/salmon01/data00/medm/include
-
-#          --- following for ade.whoi.edu (rji)----
-#             IOLIBS       =  -L/usr/local/lib  -lnetcdf
-#             IOINCS       =  -I/usr/local/include
-
-
-
-#--------------------------------------------------------------------------
-#  APPLE OS X/Absoft (G5)
-#--------------------------------------------------------------------------
-#         CPPFLAGS = $(DEF_FLAGS)  
-#         ABSOFTLIB = /Applications/Absoft/lib/f77_oldnames.o
-#         CPP      = /usr/bin/cpp
-#         FC       = f90 -YEXT_PFX=_ 
-#         DEBFLGS  =  # -qcheck -C -g
-#         OPT      =
-#--------------------------------------------------------------------------
-# APPLE / gfortran 
-#--------------------------------------------------------------------------
-         CPPFLAGS = $(DEF_FLAGS)
-         CPP      = /usr/bin/cpp
-         FC       = gfortran #-funderscoring # -fno-second-underscore
-         FLINK    = /bin/sh /usr/local/netcdf/gfortran/bin/libtool  --mode=link gfortran
-         DEBFLGS  = 
-         OPT      = 
-#--------------------------------------------------------------------------
-# LINUX / ifort 
-#--------------------------------------------------------------------------
-#        CPPFLAGS = $(DEF_FLAGS)
-#         CPP      = /usr/bin/cpp
-#         FC       = ifort #-funderscoring # -fno-second-underscore
-#         FLINK    = $(FC) 
-#         DEBFLGS  =
-#         OPT      =
-
+#==========================================================================
+#  BEG USER DEFINITION SECTION
+#==========================================================================
+include make.inc
 #==========================================================================
 #  END USER DEFINITION SECTION
 #==========================================================================
