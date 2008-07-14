@@ -1,3 +1,4 @@
+
 #-----------BEGIN MAKEFILE-------------------------------------------------
             SHELL         = /bin/sh
             DEF_FLAGS     = -P -C -traditional 
@@ -5,6 +6,18 @@
 #==========================================================================
 #  BEG USER DEFINITION SECTION
 #==========================================================================
+#         ==== REQUIRED
+#          IOLIBS       =  /usr/local/netcdf/gfortran/lib/libnetcdf.la
+#          IOINCS       =  -I/usr/local/netcdf/gfortran/include
+#          CPPFLAGS = $(DEF_FLAGS)
+#          CPP      = /usr/bin/cpp
+#          FC       = gfortran #-funderscoring # -fno-second-underscore
+
+#          ==== OPTIONAL
+#          FLINK    = /bin/sh /usr/local/netcdf/gfortran/bin/libtool  --mode=link gfortran
+#          DEBFLGS  =
+#          OPT      =
+
 include make.inc
 #==========================================================================
 #  END USER DEFINITION SECTION
