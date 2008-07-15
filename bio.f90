@@ -1,1 +1,1 @@
-bio_lobster.f90
+bio_copepod.f90
