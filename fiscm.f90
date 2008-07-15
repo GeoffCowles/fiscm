@@ -91,10 +91,12 @@ Program fiscm
 
     call cdf_out(ngroups,igroups,its,t,NCDO_OUTPUT)
 
+    if(mod(its,50)==0)then
     if(.not. checkstatus(ngroups,igroups,t))then
       write(*,*)'no active particles left in the simulation'
       write(*,*)'shutting down prematurely'
       exit
+    endif
     endif
 
     t = t + deltaT
@@ -131,7 +133,7 @@ Subroutine setup
   open(unit=iunit,file='fiscm.nml',form='formatted')
   read(unit=iunit,nml=nml_fiscm,iostat=ios)
   if(ios /= 0)then
-    write(*,*)'fatal error: could not read fiscm namelist from fiscm.nml'
+    write(*,*)'fatal error: could not read fiscm namelist from fiscm.nml',ios
     stop
   endif
 
