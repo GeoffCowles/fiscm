@@ -17,6 +17,7 @@ Module fiscm_data
   type(igroup), allocatable :: igroups(:)
   real(sp) :: beg_time,end_time
   real(sp) :: deltaT
+  integer  :: Ireport 
   integer  :: sim_direction
   integer  :: ngroups
   character(len=fstr) :: forcing_file
@@ -25,6 +26,7 @@ Module fiscm_data
       beg_time,       & 
       end_time,       &
       deltaT,         &
+      ireport,        &
       Ngroups,        &
       forcing_file
   
@@ -91,7 +93,7 @@ Program fiscm
 
     call cdf_out(ngroups,igroups,its,t,NCDO_OUTPUT)
 
-    if(mod(its,50)==0)then
+    if(mod(its,Ireport)==0)then
     if(.not. checkstatus(ngroups,igroups,t))then
       write(*,*)'no active particles left in the simulation'
       write(*,*)'shutting down prematurely'
@@ -156,6 +158,7 @@ Subroutine setup
   if(sim_direction == -1)  write(*,*)'direction:      backward'
   write(*,*)'time step(s) ',deltaT
   write(*,*)'num groups:  ',ngroups
+  write(*,*)'Ireport   :  ',Ireport
 
   !read and allocate individual groups
   allocate(igroups(ngroups))
