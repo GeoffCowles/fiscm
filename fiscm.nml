@@ -2,6 +2,7 @@
  beg_time        = 0.0 ,
  end_time        = 75.0,     
  deltaT          = 3600.,
+ ireport         = 100,
  ngroups         = 1,
  forcing_file    = 'NONE'
 /
