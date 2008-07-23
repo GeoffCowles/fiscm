@@ -43,3 +43,18 @@
 /
 
 
+ &NML_GROUPX
+ Tnind            = 6,
+ space_dim        = 0,
+ group_name       = 'C. hyperboreus ',
+ hdiff_type       = 1,
+ hdiff_const_val  = 20.,
+ vdiff_type       = 0,
+ vdiff_const_val  = 0.0,
+ intvl_bio        = 10,
+ biology          = T,
+ intvl_out        = 10,
+ start_out        = 0.0,
+ statefile        = 'copepod.nml',
+ paramfile        = 'chyp.nml',
+ nstate           = 4
