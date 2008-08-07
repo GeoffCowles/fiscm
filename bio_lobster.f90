@@ -1,15 +1,22 @@
 !=======================================================================
-! Fiscm Biology Example (Homerus americanus from Incze et al.)
-! Copyright:    2008(c)
+! Fiscm Biology Example 
 !
-! THIS IS A DEMONSTRATION RELEASE. THE AUTHOR(S) MAKE NO REPRESENTATION
-! ABOUT THE SUITABILITY OF THIS SOFTWARE FOR ANY OTHER PURPOSE. IT IS
-! PROVIDED "AS IS" WITHOUT EXPRESSED OR IMPLIED WARRANTY.
+! Description
+!  - i-state model for Homerus americanus (from L. Incze et al.) 
+!  - uses temperature-dependent stage duration 
 !
-! THIS ORIGINAL HEADER MUST BE MAINTAINED IN ALL DISTRIBUTED
-! VERSIONS.
+! Comments:
+!  - contains two routines:
+!     init_bio: read optional namelist to set params
+!               set initial positions (x,y,s)
+!               set spawning times
+!               add global information to NetCDF output
+!  advance_bio: advance the biological state in time 
+!               e.g. grow, die, settle, reproduce
 !
-! Comments:     FISCM Global Type and Associated Functions
+! !REVISION HISTORY:                   
+!  Original author(s): G. Cowles 
+!
 !=======================================================================
 
 Module Bio 
@@ -40,10 +47,16 @@ contains
 !------------------------------------------------------------------
 subroutine init_bio(g,Nind_start)
   use output_routines
+  implicit none
   type(igroup), intent(inout) :: g
   integer,      intent(in)    :: Nind_start
   integer :: iunit,ios
   logical :: fexist
+  real(sp), pointer :: tspawn(:)
+  real(sp), pointer :: x(:)
+  real(sp), pointer :: y(:)
+  real(sp), pointer :: s(:)
+  integer :: i
 
   !set current problem size
   if(Nind_start < 0)then
@@ -63,15 +76,62 @@ subroutine init_bio(g,Nind_start)
     write(*,*)'fatal error: namelist file: fiscm.nml does not exist, stopping...'
     stop 
   endif
-  write(*,*)'initializing namelist using paramfile',g%paramfile
+  iunit = 33
   open(unit=iunit,file=trim(g%paramfile),form='formatted')
   read(unit=iunit,nml=nml_lobster,iostat=ios)
   if(ios /= 0)then
     write(*,*)'fatal error: could not read lobster namelist from: ',trim(g%paramfile)
     stop
   endif
+  close(iunit)
   endif ! file /= NONE
+
+  !set the spawning time
+  call get_state('tspawn',g,tspawn)
+  tspawn(1) = (1.1/24)*day_2_sec
+  tspawn(2:g%Nind) = (2./24.)*day_2_sec
+  tspawn(:) = 1.1*day_2_sec  !0.0
   
+  !set the spawning location
+  !-----------------------------------
+  ! 2D,3D -> initialize x,y 
+  !-----------------------------------
+  if(g%space_dim > 1)then
+    call get_state('x',g,x)
+    call get_state('y',g,y)
+    !gom
+    do i=1,g%Nind
+      x(i) = 1.192e6 
+      y(i) = -76600 
+    end do
+  
+    !fake_forcing
+    !do i=1,g%Nind
+    !  x(i) = 0.0
+    !  y(i) = 0.0 
+    !end do
+    
+  endif
+  !-----------------------------------
+  ! 3D -> initialize s-coordinate
+  !-----------------------------------
+  if(g%space_dim > 2)then
+    call get_state('s',g,s)
+    do i=1,g%Nind
+      s(i) = -float(i-1)/float(g%Nind-1)
+    end do
+  endif
+
+!  skagit
+!  do i=1,g%Nind
+!    x(i) = 540006 + float(i)*100.
+!    y(i) = 5.3526256e6 + float(i)*100.
+!  end do
+!  test data
+!  do i=1,g%Nind
+!    x(i) = float(i-1)*100. 
+!    y(i) = 0.0 
+!  end do
 
   !add parameters to netcdf file header 
   call add_cdfglobs(g,"info","some kind of info")
@@ -79,6 +139,7 @@ subroutine init_bio(g,Nind_start)
   call add_cdfglobs(g,"fcomp_settle",fcomp_settle)
   call add_cdfglobs(g,"SCF",SCF)
 
+  
 end subroutine init_bio 
 
 !------------------------------------------------------------------
