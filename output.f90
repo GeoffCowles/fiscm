@@ -1,17 +1,17 @@
 !=======================================================================
-! Fiscm NetCDF Output Routines
-! Copyright:    2008(c)
+! Fiscm NetCDF Output Routines 
 !
-! THIS IS A DEMONSTRATION RELEASE. THE AUTHOR(S) MAKE NO REPRESENTATION
-! ABOUT THE SUITABILITY OF THIS SOFTWARE FOR ANY OTHER PURPOSE. IT IS
-! PROVIDED "AS IS" WITHOUT EXPRESSED OR IMPLIED WARRANTY.
+! Description:
+!   Routines to output fiscm data to NetCDF 
 !
-! THIS ORIGINAL HEADER MUST BE MAINTAINED IN ALL DISTRIBUTED
-! VERSIONS.
+! Comments:  Requires fortran90 NetCDF 3.x libraries
+!    
+! !REVISION HISTORY:                   
+!  Original author(s): G. Cowles 
 !
-! Comments:  Requires fortran90 NetCDF 3x libraries
 !=======================================================================
 module output_routines
+
 use gparms
 use mod_igroup
 use netcdf
@@ -46,14 +46,17 @@ subroutine cdf_out(ng,g,itnum,time,otype)
   integer :: n
  
   select case(otype)
-  case(NCDO_HEADER)
+  !write the netcdf header file
+  case(NCDO_HEADER)             
     do n=1,ng
-      call write_header(g(n))
+      call write_header(g(n))    
     end do
+  !add the user-defined state variables to the output header
   case(NCDO_ADD_STATES)
     do n=1,ng
-      call addtocdf_states(g(n))
+      call addtocdf_states(g(n)) !
     end do
+  !output the state variables 
   case(NCDO_OUTPUT)
     do n=1,ng
       if(mod(itnum-1,g(n)%intvl_out)==0)call output_group(g(n),time)
@@ -83,22 +86,25 @@ subroutine write_header(g)
   call cfcheck( nf90_create(trim(fname),nf90_clobber,fid) ) ;  g%fid_out = fid
   
   !global attributes
-  call cfcheck( nf90_put_att(fid,nf90_global,"code"      ,"FISCM") )
+  call cfcheck( nf90_put_att(fid,nf90_global,"title", "FVCOM PARTICLE TRACKING")) 
+  call cfcheck( nf90_put_att(fid,nf90_global,"Conventions", "CF-1.0")) 
+  call cfcheck( nf90_put_att(fid,nf90_global,"source"      ,"ParticleFVCOM_3.0"))  !trim(FISCM_VERSION)) )
   call cfcheck( nf90_put_att(fid,nf90_global,"group"     ,g%id) )
   call cfcheck( nf90_put_att(fid,nf90_global,"DT_bio"    ,g%DT_bio) )
 
-  !write the dimensions (time, number of individuals)
-  call cfcheck(nf90_def_dim(fid,"nlag",g%Tnind       , nlag_did) )
+  !define the time dimension   
   call cfcheck(nf90_def_dim(fid,"time",nf90_unlimited, time_did) )
-
-  !define the dimensions   
-  dynm2d = (/nlag_did,time_did/)
   dynm1d = (/time_did/)
 
   !time variable
   call cfcheck( nf90_def_var(fid,"time",nf90_float,dynm1d, time_vid) )
   call cfcheck( nf90_put_att(fid, time_vid,"long_name","time") )
-  call cfcheck( nf90_put_att(fid, time_vid,"units","days") )
+  call cfcheck( nf90_put_att(fid, time_vid,"units","days since 0.0") )
+  call cfcheck( nf90_put_att(fid, time_vid,"time zone","none") )
+
+  !lag dimension
+  call cfcheck(nf90_def_dim(fid,"nlag",g%Tnind       , nlag_did) )
+  dynm2d = (/nlag_did,time_did/)
 
   !close the file
   call cfcheck( nf90_close(g%fid_out) )
@@ -243,6 +249,9 @@ subroutine output_group(g,time)
 
 end subroutine output_group
 
+!-----------------------------------------------
+! runtime errors 
+!-----------------------------------------------
 subroutine cfcheck(status)
     integer, intent ( in) :: status
 
