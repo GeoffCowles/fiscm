@@ -57,10 +57,15 @@ contains
 
 subroutine init_bio(g,Nind_start)
        use output_routines
+       use utilities 
        type(igroup), intent(inout) :: g
        integer,      intent(in)    :: Nind_start
-       integer :: iunit, ios
+       integer :: iunit, ios, i, np
        logical :: fexist
+       real(sp) , pointer :: tspawn(:)
+       real(sp) , pointer :: x(:)
+       real(sp) , pointer :: y(:)
+       real(sp) , pointer :: s(:)
 
            
       !set current problem size
@@ -72,6 +77,8 @@ subroutine init_bio(g,Nind_start)
        stop
        endif
        g%Nind = Nind_start
+  !set problem size
+  np = g%Nind
 
   !read the namelist (if any) 
   if(g%paramfile /= "NONE")then
@@ -80,17 +87,44 @@ subroutine init_bio(g,Nind_start)
     write(*,*)'fatal error: namelist file: fiscm.nml does not exist, stopping...'
     stop 
   endif
-  write(*,*)'initializing namelist using paramfile',g%paramfile
+  write(*,*)'initializing namelist using paramfile: ',g%paramfile
   open(unit=iunit,file=trim(g%paramfile),form='formatted')
   read(unit=iunit,nml=nml_copepod,iostat=ios)
   if(ios /= 0)then
-    write(*,*)'fatal error: could not read lobster namelist from: ',trim(g%paramfile)
+    write(*,*)'fatal error: could not read copepod namelist from: ',trim(g%paramfile)
     stop
   endif
   endif ! file /= NONE
  write(*, nml=nml_copepod)
 
-  
+ !------------------------------------
+ ! set the spawning time
+ !------------------------------------
+  call get_state('tspawn',g,tspawn)
+  tspawn(1:np) = 0.0*day_2_sec  
+  nullify(tspawn)
+ 
+  !-----------------------------------
+  ! 2D,3D -> initialize x,y 
+  !-----------------------------------
+  if(g%space_dim > 1)then
+    call get_state('x',g,x)
+    call get_state('y',g,y)
+    call random_square(np,-2500._sp,2500._sp,-2500._sp,2500._sp,x,y)
+    nullify(x)
+    nullify(y)
+  endif
+  !-----------------------------------
+  ! 3D -> initialize s-coordinate
+  !-----------------------------------
+  if(g%space_dim > 2)then
+    call get_state('s',g,s)
+    do i=1,g%Nind
+      s(i) = -float(i-1)/float(g%Nind-1)
+    end do
+    nullify(s)
+  endif
+
 
   !add parameters to netcdf file header 
   call add_cdfglobs(g,"info","some kind of info")
@@ -157,7 +191,6 @@ subroutine advance_bio(g,mtime)
                  stg_duri = BEL_A(stage(i))*((T(i)+BEL_ALPHA)**BEL_BETA) 
                  stg_durj = BEL_A(stage(i)+1)*((T(i)+BEL_ALPHA)**BEL_BETA)
                  stg_durdiff = stg_durj - stg_duri
-                 write(*,*)stg_durdiff,pasd(i),stage(i)
                  PASD(i) = PASD(i) + (deltaT/stg_durdiff)   
 
 !If stage has surpassed 13, need to make half of those go to 14 instead (half male, half female)
@@ -186,6 +219,12 @@ subroutine advance_bio(g,mtime)
 
 
        ENDDO sind_loop 
+! nullify pointers 
+  nullify(PASD)
+  nullify(T)
+  nullify(istatus)
+  nullify(stage)
+  nullify(diapause)
 
 End Subroutine advance_bio
 
