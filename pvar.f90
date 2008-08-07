@@ -1,15 +1,14 @@
 !=======================================================================
-! Fiscm Polymorphic Type
-! Copyright:    2008(c)
+! Fiscm Polymorphic Type 
 !
-! THIS IS A DEMONSTRATION RELEASE. THE AUTHOR(S) MAKE NO REPRESENTATION
-! ABOUT THE SUITABILITY OF THIS SOFTWARE FOR ANY OTHER PURPOSE. IT IS
-! PROVIDED "AS IS" WITHOUT EXPRESSED OR IMPLIED WARRANTY.
+! Description
+!   Defines a Polymorphic Type to store user and fiscm-defined state  
+!     variables
+!   Enable access to data stored in linked-lists through pointers
+!    
+! !REVISION HISTORY:                   
+!  Original author(s): G. Cowles 
 !
-! THIS ORIGINAL HEADER MUST BE MAINTAINED IN ALL DISTRIBUTED
-! VERSIONS.
-!
-! Comments:     FISCM Polymorphic Type and associated functions
 !=======================================================================
 
 Module mod_pvar
@@ -32,10 +31,10 @@ type pvar
   integer :: idim
   integer :: istype
   logical :: isintern
-  character(len=sstr) :: varname
-  character(len=cstr) :: longname
-  character(len=cstr) :: units
-  character(len=cstr) :: from_ext_var
+  character(len=fstr) :: varname
+  character(len=fstr) :: longname
+  character(len=fstr) :: units
+  character(len=fstr) :: from_ext_var
   integer             :: output
   integer             :: nc_vid
 !  switch to allocatable type components when gfortran 4.2+ 
@@ -142,7 +141,8 @@ function get_pvar(plist,vname) result(p)
   end do
 
   if(.not.found)then
-    write(*,*)'variable: ',trim(vname),' is not a member of state vector for group: '
+    write(*,*)'error in get_pvar'
+    write(*,*)'variable: ',trim(vname),' is not a state variable for group'
     stop
   endif
   
@@ -150,6 +150,7 @@ function get_pvar(plist,vname) result(p)
 end function get_pvar
     
 subroutine print_state_vars(plist)
+  use utilities
   type(pvar_list) :: plist
   type(pvar_node), pointer :: plst,pnew
   
@@ -160,9 +161,9 @@ subroutine print_state_vars(plist)
     write(*,*)'plist has no nodes'
     stop
   endif
-  write(*,*)'----------------------------------------------------------------------'
+  call drawline("-")
   write(*,*)'state variable|          long name           | units    | external var'
-  write(*,*)'----------------------------------------------------------------------'
+  call drawline("-")
 
   do 
     if(.not.associated(plst%next)) exit
@@ -246,8 +247,8 @@ subroutine write_cdf_data(plist,fid,frame)
   pnew => plst%next
 
   if(.not.associated(plst%next))then
-	write(*,*)'plist has no nodes'
-	stop
+    write(*,*)'plist has no nodes'
+    stop
   endif
   do 
     if(.not.associated(plst%next)) exit
