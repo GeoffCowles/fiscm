@@ -1,0 +1,31 @@
+#          --- following for oscar/rudy ----
+	  IOLIBS       =  /usr/local/netcdf/gfortran/lib/libnetcdf.la
+          IOINCS       =  -I/usr/local/netcdf/gfortran/include
+
+
+#          --- following for minke ----
+#             colon=:
+#             empty=
+#             dashI= $(empty) -I
+#	     dashL= $(empty) -L
+#             IOLIBS       =  -L$(subst $(colon),$(dashL),$(LIBPATH)) -lnetcdf 
+#             IOINCS       =  -I$(subst $(colon),$(dashI),$(INCLUDEPATH)) 
+
+#--------------------------------------------------------------------------
+# APPLE / gfortran 
+#--------------------------------------------------------------------------
+         CPPFLAGS = $(DEF_FLAGS)
+         CPP      = /usr/bin/cpp
+         FC       = gfortran #-funderscoring # -fno-second-underscore
+         FLINK    = /bin/sh /usr/local/netcdf/gfortran/bin/libtool  --mode=link gfortran
+         DEBFLGS  = 
+         OPT      = -O3
+#--------------------------------------------------------------------------
+# LINUX / ifort 
+#--------------------------------------------------------------------------
+#        CPPFLAGS = $(DEF_FLAGS)
+#         CPP      = /usr/bin/cpp
+#         FC       = ifort #-funderscoring # -fno-second-underscore
+#         FLINK    = ifort ##/bin/sh /usr/local/netcdf/gfortran/bin/libtool  --mode=link gfortran
+#         DEBFLGS  = 
+#         OPT      = -O3
