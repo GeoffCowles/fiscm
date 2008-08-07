@@ -84,7 +84,7 @@ subroutine init_bio(g,Nind_start)
   if(g%paramfile /= "NONE")then
   inquire(file=trim(g%paramfile),exist=fexist)
   if(.not.fexist)then
-    write(*,*)'fatal error: namelist file: ',trim(g%paramfile)' does not exist, stopping...'
+    write(*,*)'fatal error: namelist file: ',trim(g%paramfile),' does not exist, stopping...'
     stop 
   endif
   write(*,*)'initializing namelist using paramfile: ',g%paramfile
