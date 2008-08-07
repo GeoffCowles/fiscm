@@ -5,6 +5,14 @@
             EXEC          = fiscm 
 #==========================================================================
 #  BEG USER DEFINITION SECTION
+#    REQUIRED:
+#       1.) Fortran90 Compiler
+#       2.) NetCDF 3.x libraries with Fortran90 interface 
+#           it would be best if they were built using the same compiler
+#       3.) In some compilers, iargc/getarg are not standard
+#           for example, Absoft 9.x requires a link to library U77 (-lU77)
+#           if you are using gfortran/intel you should not have to worry
+#           about this.
 #==========================================================================
 #         ==== REQUIRED
 #          IOLIBS       =  /usr/local/netcdf/gfortran/lib/libnetcdf.la
@@ -47,8 +55,8 @@ include make.inc
 #--------------------------------------------------------------------------
 
 
-F95FILES=    gparms.f90 utilities.f90 mod_pvar.f90 mod_igroup.f90 bio.f90\
-		adv_diff.f90 output.f90 forcing.f90 fiscm.f90
+F95FILES=    gparms.f90 utilities.f90 pvar.f90 igroup.f90 bio.f90\
+		drivers.f90 output.f90 forcing.f90 fvcom_driver.f90 fiscm.f90
 
 
  SRCS = $(F95FILES) 
@@ -76,7 +84,7 @@ depend:
 #--------------------------------------------------------------------------
 
 tarfile:
-	tar cvf fiscm.tar *.f90  makefile input.txt  makedepends 
+	tar cvf fiscm.tar *.f90  makefile *.txt *.nml  makedepends make.inc
 
 #--------------------------------------------------------------------------
 #  Cleaning targets.
