@@ -1,0 +1,85 @@
+&NML_FISCM
+ beg_time_days   = 1.0,
+ end_time_days   = 10.,     
+ deltaT          = 20.,
+ ireport         = 180,
+ ngroups         = 1,
+ forcing_file    = 'gom1_0001.nc'
+/
+
+
+ &NML_GROUP
+ Tnind            = 3,
+ space_dim        = 3,
+ group_name       = 'Lobster', 
+ hdiff_type       = 0,
+ hdiff_const_val  = 10.,
+ vdiff_type       = 0,
+ vdiff_const_val  = 0.0,
+ vdiff_substeps   = 5
+ intvl_bio        = 180,
+ biology          = T,
+ intvl_out        = 180,
+ start_out        = 0.0,
+ nstate           = 5,
+ statefile        = 'lobster.nml',
+ paramfile        = 'lobster.nml'
+/
+
+ &NML_STATEVAR
+ state_varname          = 'stage',
+ state_longname         = 'stage',
+ state_units            = '-',
+ state_netcdf_out       = 1,
+ state_vartype          = 1,
+ state_initval_int      = 1,
+ state_initval_flt      = 0.0,
+ state_from_ext_var     = 'NONE'
+/
+
+ &NML_STATEVAR
+ state_varname          = 'PASD',
+ state_longname         = 'Model Currency',
+ state_units            = '-',
+ state_netcdf_out       = 1,
+ state_vartype          = 2,
+ state_initval_int      = 1,
+ state_initval_flt      = 0.0,
+ state_from_ext_var     = 'NONE'
+/
+ &NML_STATEVAR
+ state_varname          = 'T',
+ state_longname         = 'temperature',
+ state_units            = 'C',
+ state_netcdf_out       = 1,
+ state_vartype          = 2,
+ state_initval_int      = 1,
+ state_initval_flt      = 12.0,
+ state_from_ext_var     = 'temp'
+/
+ &NML_STATEVAR
+ state_varname          = 'KH',
+ state_longname         = 'eddy diffusivity'
+ state_units            = 'm^2/s',
+ state_netcdf_out       = 1,
+ state_vartype          = 1,
+ state_initval_int      = 0,
+ state_initval_flt      = 0.0,
+ state_from_ext_var     = 'none'
+/
+ &NML_STATEVAR
+ state_varname          = 'N',
+ state_longname         = 'number of individuals',
+ state_units            = '-',
+ state_netcdf_out       = 1,
+ state_vartype          = 1,
+ state_initval_int      = 50000,
+ state_initval_flt      = 0.0,
+ state_from_ext_var     = 'NONE'
+/
+
+ &NML_LOBSTER
+ fcomp_settle           = 0.5,
+ SCF                    = 0.4
+/
+
