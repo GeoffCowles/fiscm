@@ -1,45 +1,30 @@
 gparms.o : gparms.f90 
-mod_pvar.o : mod_pvar.f90 gparms.o 
-mod_igroup.o : mod_igroup.f90 mod_pvar.o gparms.o 
-bio.o : bio.f90 mod_igroup.o gparms.o 
-adv_diff.o : adv_diff.f90 mod_igroup.o gparms.o 
-output.o : output.f90 mod_igroup.o gparms.o 
-fiscm.o : fiscm.f90 output.o bio.o adv_diff.o mod_igroup.o gparms.o 
+utilities.o : utilities.f90 gparms.o 
+pvar.o : pvar.f90 utilities.o gparms.o 
+igroup.o : igroup.f90 utilities.o pvar.o gparms.o 
+bio.o : bio.f90 output.o igroup.o gparms.o 
+drivers.o : drivers.f90 bio.o fvcom_driver.o igroup.o gparms.o 
+output.o : output.f90 igroup.o gparms.o 
+forcing.o : forcing.f90 utilities.o igroup.o gparms.o 
+fvcom_driver.o : fvcom_driver.f90 utilities.o forcing.o igroup.o gparms.o 
+fiscm.o : fiscm.f90 utilities.o output.o bio.o drivers.o forcing.o igroup.o gparms.o 
 gparms.o : gparms.f90 
-mod_pvar.o : mod_pvar.f90 gparms.o 
-mod_igroup.o : mod_igroup.f90 mod_pvar.o gparms.o 
-bio.o : bio.f90 mod_igroup.o gparms.o 
-adv_diff.o : adv_diff.f90 mod_igroup.o gparms.o 
-output.o : output.f90 mod_igroup.o gparms.o 
-fiscm.o : fiscm.f90 output.o bio.o adv_diff.o mod_igroup.o gparms.o 
+utilities.o : utilities.f90 gparms.o 
+pvar.o : pvar.f90 utilities.o gparms.o 
+igroup.o : igroup.f90 utilities.o pvar.o gparms.o 
+bio.o : bio.f90 utilities.o output.o igroup.o gparms.o 
+drivers.o : drivers.f90 bio.o fvcom_driver.o igroup.o gparms.o 
+output.o : output.f90 igroup.o gparms.o 
+forcing.o : forcing.f90 utilities.o igroup.o gparms.o 
+fvcom_driver.o : fvcom_driver.f90 utilities.o forcing.o igroup.o gparms.o 
+fiscm.o : fiscm.f90 utilities.o output.o bio.o drivers.o forcing.o igroup.o gparms.o 
 gparms.o : gparms.f90 
-mod_pvar.o : mod_pvar.f90 gparms.o 
-mod_igroup.o : mod_igroup.f90 mod_pvar.o gparms.o 
-bio.o : bio.f90 output.o mod_igroup.o gparms.o 
-adv_diff.o : adv_diff.f90 mod_igroup.o gparms.o 
-output.o : output.f90 mod_igroup.o gparms.o 
-fiscm.o : fiscm.f90 output.o bio.o adv_diff.o mod_igroup.o gparms.o 
-gparms.o : gparms.f90 
-mod_pvar.o : mod_pvar.f90 gparms.o 
-mod_igroup.o : mod_igroup.f90 mod_pvar.o gparms.o 
-bio.o : bio.f90 output.o mod_igroup.o gparms.o 
-adv_diff.o : adv_diff.f90 mod_igroup.o gparms.o 
-output.o : output.f90 mod_igroup.o gparms.o 
-forcing.o : forcing.f90 mod_igroup.o gparms.o 
-fiscm.o : fiscm.f90 output.o bio.o adv_diff.o mod_igroup.o gparms.o 
-gparms.o : gparms.f90 
-mod_pvar.o : mod_pvar.f90 gparms.o 
-mod_igroup.o : mod_igroup.f90 mod_pvar.o gparms.o 
-bio.o : bio.f90 output.o mod_igroup.o gparms.o 
-adv_diff.o : adv_diff.f90 mod_igroup.o gparms.o 
-output.o : output.f90 mod_igroup.o gparms.o 
-forcing.o : forcing.f90 mod_igroup.o gparms.o 
-fiscm.o : fiscm.f90 forcing.o output.o bio.o adv_diff.o mod_igroup.o gparms.o 
-gparms.o : gparms.f90 
-mod_pvar.o : mod_pvar.f90 gparms.o 
-mod_igroup.o : mod_igroup.f90 mod_pvar.o gparms.o 
-bio.o : bio.f90 output.o mod_igroup.o gparms.o 
-adv_diff.o : adv_diff.f90 mod_igroup.o gparms.o 
-output.o : output.f90 mod_igroup.o gparms.o 
-forcing.o : forcing.f90 mod_igroup.o gparms.o 
-fiscm.o : fiscm.f90 forcing.o output.o bio.o adv_diff.o mod_igroup.o gparms.o 
+utilities.o : utilities.f90 gparms.o 
+pvar.o : pvar.f90 utilities.o gparms.o 
+igroup.o : igroup.f90 utilities.o pvar.o gparms.o 
+bio.o : bio.f90 utilities.o output.o igroup.o gparms.o 
+drivers.o : drivers.f90 bio.o fvcom_driver.o igroup.o gparms.o 
+output.o : output.f90 igroup.o gparms.o 
+forcing.o : forcing.f90 utilities.o igroup.o gparms.o 
+fvcom_driver.o : fvcom_driver.f90 utilities.o forcing.o igroup.o gparms.o 
+fiscm.o : fiscm.f90 utilities.o output.o bio.o drivers.o forcing.o igroup.o gparms.o 
