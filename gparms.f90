@@ -1,15 +1,15 @@
 !=======================================================================
-! Fiscm Global Parameters
-! Copyright:    2008(c)
+! Fiscm Global Parameters 
 !
-! THIS IS A DEMONSTRATION RELEASE. THE AUTHOR(S) MAKE NO REPRESENTATION
-! ABOUT THE SUITABILITY OF THIS SOFTWARE FOR ANY OTHER PURPOSE. IT IS
-! PROVIDED "AS IS" WITHOUT EXPRESSED OR IMPLIED WARRANTY.
+! Description
+!   Defines global params (constants) for the fiscm code 
+!    
+! Comments: 
+!    Originally from the OSCAR shallow water equation solver
 !
-! THIS ORIGINAL HEADER MUST BE MAINTAINED IN ALL DISTRIBUTED
-! VERSIONS.
+! !REVISION HISTORY:                   
+!  Original author(s): G. Cowles 
 !
-! Comments:     FISCM Global Parameters
 !=======================================================================
 
 Module Gparms  
@@ -30,6 +30,9 @@ real(sp), parameter :: ahalf = 0.500_sp
 real(sp), parameter :: zero  = 0.000_sp
 real(sp), parameter :: one   = 1.000_sp
 
+!max arrays sizes
+integer, parameter :: max_state_vars = 200
+
 !----------------------------------------------------------------
 !string length
 !    fstr:    filename length
@@ -37,12 +40,14 @@ real(sp), parameter :: one   = 1.000_sp
 !    sstr:    short string length
 !    tstr:    text string
 !    cstr:    string variable standard length
+!    mstr:    message length
 !----------------------------------------------------------------
 integer, parameter  :: fstr = 120  
 integer, parameter  :: tstr = 120 
 integer, parameter  :: vstr = 30    
 integer, parameter  :: sstr = 15   
 integer, parameter  :: cstr = 30 
+integer, parameter  :: mstr = 120 
 !----------------------------------------------------------------
 !time
 !     day_2_sec:    convert days to seconds 
@@ -51,6 +56,12 @@ integer, parameter  :: cstr = 30
 
 real(sp), parameter :: day_2_sec = 86400. 
 real(sp), parameter :: sec_2_day = one/day_2_sec 
+
+!----------------------------------------------------------------
+!statistical
+!      rvar:  variance of a uniform random walk [-1,1]
+!----------------------------------------------------------------
+real(sp), parameter :: rvar = a3rd
 
 !----------------------------------------------------------------
 !trigonometric
@@ -109,10 +120,16 @@ integer, parameter :: ACTIVE = 1
 !----------------------------------------------------------------
 integer, parameter :: HDIFF_NONE     = 0
 integer, parameter :: HDIFF_CONSTANT = 1
-integer, parameter :: HDIFF_VISSER   = 2
+integer, parameter :: HDIFF_VARIABLE = 2
 integer, parameter :: VDIFF_NONE     = 0
-integer, parameter :: VDIFF_CONSTANT = 1
-integer, parameter :: VDIFF_VISSER   = 2
+integer, parameter :: VDIFF_VARIABLE = 1
+integer, parameter :: VDIFF_SPLINED  = 2
+integer, parameter :: VDIFF_BINNED   = 3
+
+!----------------------------------------------------------------
+! version 
+!----------------------------------------------------------------
+character(len=fstr) :: FISCM_VERSION = "fiscm1.0"
 
 
 End Module Gparms
