@@ -1,18 +1,16 @@
 !=======================================================================
-! Fiscm IGroup Type
-! Copyright:    2008(c)
+! Fiscm Igroup 
 !
-! THIS IS A DEMONSTRATION RELEASE. THE AUTHOR(S) MAKE NO REPRESENTATION
-! ABOUT THE SUITABILITY OF THIS SOFTWARE FOR ANY OTHER PURPOSE. IT IS
-! PROVIDED "AS IS" WITHOUT EXPRESSED OR IMPLIED WARRANTY.
+! Description
+!   Defines a group type for Fiscm 
+!     -initialize the group
+!     -add state variables to the group
+!     -summarize the group
+!    
+! !REVISION HISTORY:                   
+!  Original author(s): G. Cowles 
 !
-! THIS ORIGINAL HEADER MUST BE MAINTAINED IN ALL DISTRIBUTED
-! VERSIONS.
-!
-! Comments:     FISCM - Groups of Like Individuals 
-! 
 !=======================================================================
-
 Module mod_igroup
 
 Use gparms
@@ -23,6 +21,7 @@ Implicit None
 !group - for i/o
 integer  :: Tnind,nind,space_dim,nstate
 integer  :: hdiff_type,vdiff_type
+integer  :: vdiff_substeps
 integer  :: intvl_out
 integer  :: intvl_bio
 real(sp) :: tlast_out,start_out
@@ -40,6 +39,7 @@ Namelist /NML_GROUP/     &
    & hdiff_const_val,    &
    & vdiff_type,         &
    & vdiff_const_val,    &
+   & vdiff_substeps,     &
    & intvl_bio,          &
    & biology,            &
    & intvl_out,          &
@@ -69,16 +69,17 @@ Namelist /NML_STATEVAR/   &
 
 !Group type
 type igroup 
-  integer             :: id
-  integer             :: Tnind
-  integer             :: nind
-  integer             :: space_dim
-  character(len=fstr) :: name
-  real(sp)            :: hdiff_const_val
-  real(sp)            :: vdiff_const_val
-  integer             :: hdiff_type
+  integer             :: id                         !unique group id
+  integer             :: Tnind                      !total number of group individuals
+  integer             :: nind                       !active subset
+  integer             :: space_dim                  !spatial dimension of problem 0,1,2,3
+  character(len=fstr) :: name                       !group name (e.g. species)
+  integer             :: hdiff_type                 !horizontal diffusion type (HDIFF_NONE,HDIFF_CONST,HDIFF_VISSER)
+  real(sp)            :: hdiff_const_val            !constant value  
   integer             :: vdiff_type
-  integer             :: intvl_bio
+  real(sp)            :: vdiff_const_val
+  integer             :: vdiff_substeps
+  integer             :: intvl_bio                  
   real(sp)            :: DT_bio
   logical             :: biology
   integer             :: intvl_out
@@ -91,6 +92,9 @@ type igroup
   character(len=fstr) :: paramfile
   type(pvar_list)     :: state
   integer             :: nstate
+  integer             :: next
+  character(len=fstr) :: ext_var(max_state_vars,2)
+  integer             :: nstate_ud
 end type igroup 
 
 interface add_state
@@ -102,11 +106,11 @@ interface get_state
   module procedure get_state_fvec
   module procedure get_state_ivec
 end interface
+
 contains
 !---------------------------------------------------------
 !Create the initial group type (passive particle)
 !---------------------------------------------------------
-!function group_(i,id,bio) result (g)
 function group_(fid,id,deltaT) result(g)
   type(igroup) :: g
   integer, intent(in) :: fid
@@ -138,7 +142,6 @@ function group_(fid,id,deltaT) result(g)
   !set time step
   g%DT_bio = intvl_bio*deltaT
 
-
   g%id     = id           
   g%Tnind  = Tnind   
   g%nind   = Tnind    
@@ -148,6 +151,7 @@ function group_(fid,id,deltaT) result(g)
   g%hdiff_const_val = hdiff_const_val
   g%vdiff_type = vdiff_type
   g%vdiff_const_val = vdiff_const_val
+  g%vdiff_substeps  = vdiff_substeps
   g%intvl_bio = intvl_bio
   g%biology = biology
   g%intvl_out = intvl_out
@@ -156,69 +160,84 @@ function group_(fid,id,deltaT) result(g)
   g%frame_out = 0
   g%fid_out   = 0
   g%fname_out = ""
-  g%nstate = 0
+  g%nstate = 0 
+  g%next   = 0
+  g%nstate_ud = nstate
   g%statefile = statefile
   g%paramfile = paramfile
   g%state = pvar_list_() 
 
   !(x,y,z) - particle position
   if(g%space_dim > 1)then
-    fval=1.;call add_state(g,'x','x location of particle','m',NETCDF_YES,fval)
-    fval=0.;call add_state(g,'y','y location of particle','m',NETCDF_YES,fval)
+    fval=0.;call add_state(g,'x','x location','m',NETCDF_YES,fval)
+    fval=0.;call add_state(g,'y','y location','m',NETCDF_YES,fval)
+    fval=0.;call add_state(g,'xn','x location at last time step','m',NETCDF_NO,fval)
+    fval=0.;call add_state(g,'yn','y location at last time step','m',NETCDF_NO,fval)
+    fval=0.;call add_state(g,'h','bathymetry','m',NETCDF_YES,fval)
     fval=0.;call add_state(g,'pathlength','integrated trajectory','m',NETCDF_YES,fval)
+    ival=0 ;call add_state(g,'cell','cell containing particle','-',NETCDF_YES,ival)
   endif
-
+  if(g%space_dim == 2)then
+    fval=0.;call add_state(g,'u','x-velocity','m/s',NETCDF_NO,fval)
+    fval=0.;call add_state(g,'v','y-velocity','m/s',NETCDF_NO,fval)
+  endif
   if(g%space_dim == 3)then
-    fval=0.;call add_state(g,'z','z location of particle','m',NETCDF_YES,fval)
+    fval=0.;call add_state(g,'u','x-velocity'  ,'m/s',NETCDF_YES,fval) 
+    fval=0.;call add_state(g,'v','y-velocity'  ,'m/s',NETCDF_YES,fval) 
+    fval=0.;call add_state(g,'w','w-velocity'  ,'m/s',NETCDF_NO ,fval)
+    fval=0.;call add_state(g,'z','z location'  ,'m'  ,NETCDF_YES,fval)
+    fval=0.;call add_state(g,'s','s coordinate','-'  ,NETCDF_YES,fval) 
   endif
 
   !(status) - particle status
-  call add_state(g,'status','particle status','-',NETCDF_YES,1)
+  call add_state(g,'status','particle status','-',NETCDF_YES,0)
 
   !(status) - spawn time
   fval=0.;call add_state(g,'tspawn','time of spawning','sec',NETCDF_NO,fval)
 
-  !--------------------------------------------------------------------
-  !user-defined state variables
-  !--------------------------------------------------------------------
-  if(statefile=="NONE" .and. nstate > 0)then
-    write(*,*)'fatal error: group: ',trim(group_name) 
-    write(*,*)'number of state variables from namelist: ',nstate
-    write(*,*)'no state variable file specified'
+end function group_
+
+!---------------------------------------------------------
+!add user defined states to the group
+!---------------------------------------------------------
+subroutine group_addstates(g) 
+  type(igroup) :: g
+  integer :: ns,ios
+  integer ,parameter :: iunit = 33
+  logical :: fexist
+
+  if(g%nstate_ud < 1)return
+
+  inquire(file=g%statefile,exist=fexist)
+  if(.not.fexist)then
+    write(*,*)'fatal error: statefile ',trim(g%statefile),' does not exist'
     stop
   endif
 
-  if(nstate > 1)then
-    inquire(file=statefile,exist=fexist)
-    if(.not.fexist)then
-      write(*,*)'fatal error: statefile ',trim(statefile),' does not exist'
+  open(unit=iunit,file=trim(g%statefile),form='formatted')
+  do ns = 1,g%nstate_ud
+
+    !read the group namelist from unit fid
+    read(unit=iunit,nml=nml_statevar,iostat=ios)
+    if(ios /= 0)then
+      write(*,*)'fatal error: could not read statevar namelist from: ',trim(g%statefile),ios
       stop
     endif
-    open(unit=fid+1,file=trim(statefile),form='formatted')
-    do ns = 1,nstate
-
-      !read the group namelist from unit fid
-      read(unit=fid+1,nml=nml_statevar,iostat=ios)
-      if(ios /= 0)then
-        write(*,*)'fatal error: could not read statevar namelist from: ',trim(statefile)
-        stop
-      endif
-      if(state_vartype == itype)then
+    if(state_vartype == itype)then
+      call add_state(g,trim(state_varname),trim(state_longname),trim(state_units), &
+                   state_netcdf_out,state_initval_int,trim(state_from_ext_var))
+    else if(state_vartype == ftype)then
         call add_state(g,trim(state_varname),trim(state_longname),trim(state_units), &
-                     state_netcdf_out,state_initval_int,state_from_ext_var)
-      else if(state_vartype == ftype)then
-          call add_state(g,trim(state_varname),trim(state_longname),trim(state_units), &
-                     state_netcdf_out,state_initval_flt,state_from_ext_var)
-      else
-        write(*,*)'fatal error: not setup for variable type ',state_vartype,' in group_'
-        stop
-      endif
-    end do
-    close(34)
-  end if !g%nstate > 1
+                   state_netcdf_out,state_initval_flt,trim(state_from_ext_var))
+    else
+      write(*,*)'fatal error: not setup for variable type ',state_vartype,' in group_'
+      stop
+    endif
+  end do
+  close(iunit)
 
 
-end function group_
+end subroutine group_addstates
 
 subroutine add_state_fvec(g,varname,longname,units,output,init_val,ext_name)
    type(igroup)        :: g 
@@ -254,6 +273,11 @@ subroutine add_state_fvec(g,varname,longname,units,output,init_val,ext_name)
    new%output   = output
   if(present(ext_name))then
      new%from_ext_var = trim(ext_name)
+     if(ext_name /= 'NONE' .and. ext_name /= 'none')then
+       g%next = g%next + 1
+       g%ext_var(g%next,1) = trim(varname)
+       g%ext_var(g%next,2) = trim(ext_name)
+     endif
    else
      new%from_ext_var = "NONE"
    endif
@@ -296,6 +320,13 @@ subroutine add_state_ivec(g,varname,longname,units,output,init_val,ext_name)
    new%istype   = itype
    if(present(ext_name))then
      new%from_ext_var = trim(ext_name)
+     if(ext_name /= 'NONE' .and. ext_name /= 'none')then
+       new%from_ext_var = trim(ext_name)
+       g%next = g%next + 1
+       g%ext_var(g%next,1) = trim(varname)
+       g%ext_var(g%next,2) = trim(ext_name)
+       write(*,*)'ADDING EXT VAR: ',trim(ext_name),'  to : ',trim(varname)
+     endif
    else
      new%from_ext_var = "NONE"
    endif
@@ -322,19 +353,63 @@ subroutine get_state_ivec(varname,g,v)
    type(igroup)        :: g
    integer, pointer    :: v(:)
    type(pvar), pointer :: p
-   
+
    p => get_pvar(g%state,varname)
    v => p%ivar
    
 end subroutine get_state_ivec
 !end function get_state_ivec
 
+!----------------------------------------------------
+! determine which variables, if any are needed for
+! forcing
+!----------------------------------------------------
+subroutine get_ext_varnames(ng,g,lsize,varlist)
+  integer, intent(in)      :: ng
+  type(igroup), intent(in) :: g(ng)
+  integer, intent(inout)   :: lsize
+  character(len=*)         :: varlist(max_state_vars)
+  !--------------------------------------------
+  integer :: i,j 
+  character(len=fstr) :: var
+
+  do i=1,ng
+    do j=1,g(i)%next
+      var = g(i)%ext_var(j,2)
+      if(lsize > 0)then
+        if(.not.inlist(var,varlist,lsize))then
+          lsize = lsize + 1
+          varlist(lsize) = var
+        endif
+      else
+        lsize = lsize + 1
+        varlist(lsize) = var
+      endif
+    end do
+  end do
+    
+end subroutine get_ext_varnames
+
+function inlist(var,varlist,ndim) result(check) 
+  character(len=*)    :: var
+  integer, intent(in) :: ndim
+  character(len=*)    :: varlist(ndim)
+  logical :: check
+  integer :: i
+  check = .false.
+  do i=1,ndim 
+    if(trim(var) == trim(varlist(i))) check = .true.
+  enddo
+end function inlist
+    
 
 subroutine print_group_summary(g) 
+   use utilities
    type(igroup)        :: g
 
-   write(*,*)
-   write(*,*)'==========================Group Summary=========================='
+   call drawline("-")
+   write(*,*)'Group Summary: ',g%id
+   call drawline("-")
    write(*,'(A21,I10)')'group id number   :: ',g%id
    write(*,'(A21,A20)')'group name        :: ',g%name
    write(*,'(A21,I10)')'total individuals :: ',g%Tnind
@@ -343,21 +418,25 @@ subroutine print_group_summary(g)
   
    select case(g%hdiff_type)
      case(HDIFF_NONE) 
-       write(*,'(A21,A20)')'hdiff type        :: ','HDIFF_NONE'
+       write(*,'(A21,A20)')'hdiff type        :: ',adjustl('HDIFF_NONE')
      case(HDIFF_CONSTANT) 
-       write(*,'(A21,A20)')'hdiff type        :: ','HDIFF_CONSTANT'
+       write(*,'(A21,A20)')'hdiff type        :: ',adjustl('HDIFF_CONSTANT')
        write(*,'(A21,F10.6)')'hdiff constant    :: ',g%hdiff_const_val
-     case(HDIFF_VISSER)   
-       write(*,'(A21,A20)')'hdiff type        :: ','HDIFF_VISSER'
+     case(HDIFF_VARIABLE)   
+       write(*,'(A21,A20)')'hdiff type        :: ','HDIFF_VARIABLE'
    end select
    select case(g%vdiff_type)
      case(VDIFF_NONE) 
        write(*,'(A21,A20)')'vdiff type        :: ','VDIFF_NONE'
-     case(VDIFF_CONSTANT) 
-       write(*,'(A21,A20)')'vdiff type        :: ','VDIFF_CONSTANT'
-       write(*,'(A21,A10)')'biology           :: ','ACTIVE'
-     case(VDIFF_VISSER)   
-       write(*,'(A21,A20)')'vdiff type        :: ','VDIFF_VISSER'
+     case(VDIFF_VARIABLE)   
+       write(*,'(A21,A20)')'vdiff type        :: ','VDIFF_VARIABLE'
+       write(*,'(A21,I10)')'vdiff substeps    :: ',vdiff_substeps
+     case(VDIFF_SPLINED)   
+       write(*,'(A21,A20)')'vdiff type        :: ','VDIFF_SPLINED'
+       write(*,'(A21,I10)')'vdiff substeps    :: ',vdiff_substeps
+     case(VDIFF_BINNED)   
+       write(*,'(A21,A20)')'vdiff type        :: ','VDIFF_BINNED'
+       write(*,'(A21,I10)')'vdiff substeps    :: ',vdiff_substeps
    end select
    if(g%biology)then
      write(*,'(A21,A10)')'biology           :: ','ACTIVE'
@@ -365,7 +444,7 @@ subroutine print_group_summary(g)
    else
      write(*,'(A21,A10)')'biology           :: ','INACTIVE'
    endif
-   write(*,'(A21,I10)')'output interval(its):: ',g%intvl_out
+   write(*,'(A21,I10)')  'output intval(its):: ',g%intvl_out
    write(*,'(A21,F10.2)')'output starts at  :: ',g%start_out
    write(*,'(A21,I10)')'num. state vars   :: ',g%nstate
 
@@ -436,13 +515,39 @@ function checkstatus(ng,g,time) result(validsim)
    write(*,101)gettime(int(time)),nTOTAL,nSETTLED,nDEAD,nACTIVE,nEXITED,nUNKNOWN
 
 
-   if(nACTIVE == 0) validsim = .false.
+   if(nACTIVE + nUNKNOWN == 0)then
+      validsim = .false.
+      call drawline('-')
+      write(*,*)'no active particles left in the simulation: shutting down early'
+   endif
 
   
  101 format(A13,1X,I8,1X,I8,1X,I8,1X,I8,1X,I8,1X,I8) 
  102 format("   simtime   ",5x," TOTAL  ",1x,"SETTLED",1x,"  DEAD  ",1X," ACTIVE ",1X," EXITED ",1x," UNKNOWN") 
 
 end function checkstatus
+
+subroutine get_spawn_range(ng,g,tspawn_min,tspawn_max)
+  integer, intent(in)      :: ng
+  type(igroup), intent(in) :: g(ng)
+  real(sp), intent(out) :: tspawn_min,tspawn_max
+  integer :: np ,n
+  real(sp), pointer :: tspawn(:) 
+
+  !initialize spawning times to extreme numbers
+  tspawn_min =  hugenum
+  tspawn_max = -hugenum
+  
+
+  !search through groups for earliest and latest spawning times
+  do n=1,ng
+    np = g(n)%Nind
+    call get_state('tspawn',g(n),tspawn)
+    tspawn_min = min( minval(tspawn(1:np)) , tspawn_min)
+    tspawn_max = max( maxval(tspawn(1:np)) , tspawn_max)
+  end do
+
+end subroutine get_spawn_range
 
 
 End Module mod_igroup
