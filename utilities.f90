@@ -402,7 +402,6 @@ function gettime(insecs) result(instring)
     do i=1,n
       x(i) = ran_from_range(xmin,xmax)
       y(i) = ran_from_range(ymin,ymax)
-      write(*,*)x(i),y(i)
     end do
     
 

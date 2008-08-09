@@ -100,7 +100,7 @@ subroutine write_header(g)
   call cfcheck( nf90_def_var(fid,"time",nf90_float,dynm1d, time_vid) )
   call cfcheck( nf90_put_att(fid, time_vid,"long_name","time") )
   call cfcheck( nf90_put_att(fid, time_vid,"units","days since 0.0") )
-  call cfcheck( nf90_put_att(fid, time_vid,"time zone","none") )
+  call cfcheck( nf90_put_att(fid, time_vid,"time_zone","none") )
 
   !lag dimension
   call cfcheck(nf90_def_dim(fid,"nlag",g%Tnind       , nlag_did) )
