@@ -636,15 +636,15 @@ subroutine advect3D(g,deltaT)
   call interp(np,x,y,s,cell,istatus,'u',u)
   call interp(np,x,y,s,cell,istatus,'v',v)
   call interp(np,x,y,s,cell,istatus,'omega',omega)
-!  call interp(np,x,y,cell,istatus,'h',h)
-!  call interp(np,x,y,cell,istatus,'zeta',zeta)
+  call interp(np,x,y,cell,istatus,'h',h)
+  call interp(np,x,y,cell,istatus,'zeta',zeta)
 
   !advance
   do i=1,np 
     if(istatus(i) < 1)cycle
     x(i) = x(i) + alpha(1)*deltaT*u(i)
     y(i) = y(i) + alpha(1)*deltaT*v(i)
-    s(i) = s(i) + alpha(1)*deltaT*omega(i) 
+    s(i) = s(i) + alpha(1)*deltaT*omega(i)/(h(i)+zeta(i)) 
   end do
 
   !adjust s-coordinate value at surface and bottom boundaries
@@ -654,8 +654,6 @@ subroutine advect3D(g,deltaT)
   end do
 
   !calculate z value of particle (for visualization)
-  call interp(np,x,y,cell,istatus,'h',h)
-  call interp(np,x,y,cell,istatus,'zeta',zeta)
   do i=1,np
     z(i) = s(i)*(h(i)+zeta(i)) + zeta(i)  
   end do
