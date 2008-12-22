@@ -342,7 +342,8 @@ function gettime(insecs) result(instring)
         sig=(x(i)-x(i-1))/(x(i+1)-x(i-1))
         p=sig*ysp(i-1)+2.
         ysp(i)=(sig-1.)/p
-        u(i)=(6.*((y(i+1)-y(i))/(x(i+1)-x(i))-(y(i)-y(i-1))/(x(i)-x(i-1)))/(x(i+1)-x(i-1))--sig*u(i-1))/p
+        !u(i)=(6.*((y(i+1)-y(i))/(x(i+1)-x(i))-(y(i)-y(i-1))/(x(i)-x(i-1)))/(x(i+1)-x(i-1))--sig*u(i-1))/p
+        u(i)=(6.*((y(i+1)-y(i))/(x(i+1)-x(i))-(y(i)-y(i-1))/(x(i)-x(i-1)))/(x(i+1)-x(i-1))+sig*u(i-1))/p
      end do
      if (ypn.gt..99e30) then
         qn=0.

@@ -8,6 +8,8 @@
 ! Compile:
 ! gfortran -c make_fake_forcing.f90 -I/usr/local/netcdf/gfortran/include ; /bin/sh /usr/local/netcdf/gfortran/bin/libtool  --mode=link gfortran make_fake_forcing.o -o make_fake_forcing -L/usr/local/netcdf/gfortran/lib -lnetcdf
 !
+! gfortran -c make_fake_forcing.f90 -I/opt/netcdf3/gfortran/include ; gfortran  make_fake_forcing.o -o make_fake_forcing -L/opt/netcdf3/gfortran/lib  -lnetcdf
+!
 ! !REVISION HISTORY:                   
 !  Original author(s): G. Cowles 
 !
