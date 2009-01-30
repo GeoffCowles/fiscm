@@ -7,6 +7,7 @@
 ! !REVISION HISTORY:                   
 !  Original author(s): G. Cowles 
 !=======================================================================
+! test rji
 Module fiscm_data
   use gparms
   use mod_igroup
