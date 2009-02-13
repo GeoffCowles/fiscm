@@ -35,12 +35,15 @@ integer, parameter :: layer_based = 2
 !Runge-Kutta integration coefficients
 integer, parameter :: nstage = 1
 real(sp),parameter :: alpha(1) = 1.0 
-
-!integer, parameter :: nstage = 4
-!real(sp),parameter :: alpha(4) = (/0.0_sp,0.5_sp,0.5_sp,1.0_sp/)
-!real(sp), parameter:: beta(4)  = (/1.0_sp/6.0_sp,1.0_sp/3.0_sp, 1.0_sp/3.0_sp,1.0_sp/6.0_sp/)
-!real(sp), parameter:: delta(4) = (/0.0_sp,0.5_sp,0.5_sp,1.0_sp/)
-
+integer, parameter :: mstage = 4
+real(sp),parameter :: A_RK(4) = (/0.0_sp,0.5_sp,0.5_sp,1.0_sp/)
+real(sp), parameter:: B_RK(4)  = (/1.0_sp/6.0_sp,1.0_sp/3.0_sp, 1.0_sp/3.0_sp,1.0_sp/6.0_sp/)
+real(sp), parameter:: C_RK(4) = (/0.0_sp,0.5_sp,0.5_sp,1.0_sp/)
+!Added by Xinyou Lin
+  integer, allocatable :: nbe(:,:)            !!INDICES OF ELMNT NEIGHBORS^M      
+  integer, allocatable :: isonb(:)            !!NODE MARKER = 0,1,2   ^M
+  integer, allocatable :: isbce(:)     
+  integer, allocatable :: nbvt(:,:)
 !dimensions
 integer :: N_lev
 integer :: N_lay
@@ -65,6 +68,12 @@ real(sp), pointer :: siglay(:,:)
 real(sp), pointer :: siglev(:,:)
 real(sp), pointer :: esiglay(:,:)
 real(sp), pointer :: esiglev(:,:)
+
+!added by Xinyou
+real(sp), pointer :: a1u(:,:)
+real(sp), pointer :: a2u(:,:)
+
+!
 logical :: grid_metrics
 
 interface interp
@@ -150,6 +159,17 @@ subroutine ocean_model_init(ng,g,lsize,varlist)
   allocate(esiglay(N_elems,N_lay))
   allocate(esiglev(N_elems,N_lev))
 
+  allocate(a2u(N_elems,4)) ;a2u   = zero
+  allocate(a1u(N_elems,4)) ;a1u   = zero
+
+  !----------------Node, Boundary Condition, and Control Volume-----------------------!
+
+ 
+  ALLOCATE(NBE(0:N_elems,3))          ;NBE      = 0  !!INDICES OF ELEMENT NEIGHBORS
+  ALLOCATE(NTVE(0:N_verts))           ;NTVE     = 0
+  ALLOCATE(ISONB(0:N_verts))          ;ISONB    = 0  !!NODE MARKER = 0,1,2
+  ALLOCATE(ISBCE(0:N_elems))          ;ISBCE    = 0
+
   !read in mesh
   msg = "error reading x coordinate"
   call ncdchk( nf90_inq_varid(fid,'x',varid),msg )
@@ -173,6 +193,13 @@ subroutine ocean_model_init(ng,g,lsize,varlist)
     msg = "error reading awy"
     call ncdchk( nf90_inq_varid(fid,'awy',varid),msg )
     call ncdchk(nf90_get_var(fid, varid, awy),msg)
+    msg = "error reading a1u"
+    call ncdchk( nf90_inq_varid(fid,'a1u',varid),msg )
+    call ncdchk(nf90_get_var(fid, varid, a1u),msg)
+    msg = "error reading a2u"
+    call ncdchk( nf90_inq_varid(fid,'a2u',varid),msg )
+    call ncdchk(nf90_get_var(fid, varid, a2u),msg)
+
   else 
     write(*,*)'WARNING:::::: AW0 AWX AWY Do NOT exist in forcing file'
     write(*,*)'Proceeding with: 1st Order interpolation' 
@@ -187,25 +214,28 @@ subroutine ocean_model_init(ng,g,lsize,varlist)
   call ncdchk(nf90_get_var(fid, varid, siglev),msg)
 
   !read secondary connectivity (nbve/ntve) 
-  grid_metrics = .false.
-  msg = "dimension 'maxelem' not in the netcdf dataset"
-  if(ncdscan( nf90_inq_dimid(fid,'maxelem',dimid),msg ) )then
-    call ncdchk(nf90_inquire_dimension(fid, dimid, dname, Max_Elems))
-    allocate(ntve(N_verts))
-    allocate(nbve(N_verts,Max_Elems))
-    msg = "error reading ntve"
-    call ncdchk( nf90_inq_varid(fid,'ntve',varid),msg )
-    call ncdchk(nf90_get_var(fid, varid, ntve),msg)
-    msg = "error reading nbve"
-    call ncdchk( nf90_inq_varid(fid,'nbve',varid),msg )
-    call ncdchk(nf90_get_var(fid, varid, nbve),msg)
-    grid_metrics = .true.
-  else 
-    write(*,*)'WARNING:::::: NTVE/NBVE Do NOT exist in forcing file'
-    write(*,*)'This will slow down the element search procedure'
-    write(*,*)'Proceeding with: 1st Order interpolation' 
-    write(*,*)'In the future, select [grid metrics] in your NetCDF namelist'
-  endif
+  !grid_metrics = .false.
+  !msg = "dimension 'maxelem' not in the netcdf dataset"
+  !if(ncdscan( nf90_inq_dimid(fid,'maxelem',dimid),msg ) )then
+  !  call ncdchk(nf90_inquire_dimension(fid, dimid, dname, Max_Elems))
+  !  allocate(ntve(N_verts))
+  !  allocate(nbve(N_verts,Max_Elems))
+  !  msg = "error reading ntve"
+  !  call ncdchk( nf90_inq_varid(fid,'ntve',varid),msg )
+  !  call ncdchk(nf90_get_var(fid, varid, ntve),msg)
+  !  msg = "error reading nbve"
+  !  call ncdchk( nf90_inq_varid(fid,'nbve',varid),msg )
+  !  call ncdchk(nf90_get_var(fid, varid, nbve),msg)
+  !  grid_metrics = .true.
+  !else 
+! Revised by Xinyou Lin  in Jan ,2009
+!    write(*,*)'WARNING:::::: NTVE/NBVE Do NOT exist in forcing file'
+!    write(*,*)'This will slow down the element search procedure'
+!    write(*,*)'Proceeding with: 1st Order interpolation' 
+!    write(*,*)'In the future, select [grid metrics] in your NetCDF namelist'
+
+!  endif
+
 
   !calculate cell center coordinates
   do i=1,N_elems
@@ -223,11 +253,14 @@ subroutine ocean_model_init(ng,g,lsize,varlist)
     end do
     esiglev(i,N_lev)  = a3rd*(sum(siglev(subset,N_lev)))
   end do
-
+  ! calculate secondary connectivity (nbve/ntve)
   !determine nbve/ntve - secondary connectivity, used
   !for searching element containing point
 
   !mark boundary elements
+  CALL TRIANGLE_GRID_EDGE
+  grid_metrics = .true.
+
 
 
   !calculate node-based interpolation coefficients  
@@ -420,8 +453,8 @@ subroutine rw_vdiff(g, dT, nstep)
   !set constants
   fac = (2./rvar)*deltaT  ![ 2*r^-1*deltaT], r = variance of uniform rw, set in gparms
 
-  call interp(np,x,y,cell,istatus,'h',h)
-  call interp(np,x,y,cell,istatus,'zeta',zeta)
+  call interp(np,x,y,cell,istatus,'h',h,3)
+  call interp(np,x,y,cell,istatus,'zeta',zeta,3)
 
   ! ==> loop over substeps
   do n=1,nstep
@@ -435,15 +468,15 @@ subroutine rw_vdiff(g, dT, nstep)
     where(s+delta_s > 0)ds = -delta_s
 
     !evaluate kh at both locations
-    call interp(np,x,y,s,cell,istatus,'kh',kh)
-    call interp(np,x,y,s+ds,cell,istatus,'kh',kh2)
+    call interp(np,x,y,s,cell,istatus,'kh',kh,3)
+    call interp(np,x,y,s+ds,cell,istatus,'kh',kh2,3)
 
     !form the derivative d(kh)/d(s)
     dkh_ds = (kh2-kh)/ds
 
     !function evaluation at [z + 0.5*dkh/dz*deltat] - Visser
     s_shift = s + dkh_ds*deltaT/((h+zeta)**2)
-    call interp(np,x,y,s_shift,cell,istatus,'kh',kh)
+    call interp(np,x,y,s_shift,cell,istatus,'kh',kh,3)
 
     ! => main loop over particles
     do p=1,np
@@ -536,71 +569,9 @@ subroutine rw_vdiff_binned(g, dT, nstep)
   integer,  intent(in) :: nstep
 end subroutine rw_vdiff_binned
 
-!----------------------------------------------------
-! 2-D Advection (use vertically-averaged velocity)
-!----------------------------------------------------
-subroutine advect2D(g,deltaT)
+subroutine sz_trans(np,g)
+  integer, intent(in) :: np
   type(igroup), intent(inout) :: g
-  real(sp), intent(in) :: deltaT
-  real(sp), pointer :: x(:)
-  real(sp), pointer :: y(:)
-  integer , pointer :: cell(:)
-  integer , pointer :: istatus(:)
-  real(sp), allocatable :: ua(:)
-  real(sp), allocatable :: va(:)
-  integer  :: k,i,np
-
-  !set problem size 
-  np = g%nind
-
-  !set pointers to states 
-  call get_state('x',g,x)
-  call get_state('y',g,y)
-  call get_state('cell',g,cell)
-  call get_state('status',g,istatus)
-
-  !allocate local data space
-  allocate(ua(np)) ; ua = 0.0
-  allocate(va(np)) ; va = 0.0
-
-  !interpolate velocity field to particle position
-  call interp(np,x,y,cell,istatus,'ua',ua)
-  call interp(np,x,y,cell,istatus,'va',va)
-
-  !advance in time with Euler step
-  do i=1,np 
-    if(istatus(i) < 1)cycle
-    x(i) = x(i) + alpha(1)*deltaT*ua(i)
-    y(i) = y(i) + alpha(1)*deltaT*va(i)
-  end do
-
-  !update element containing particle => cell 
-  call find_element(np,x,y,cell,istatus)
-
-  !apply boundary conditions (reflect off solid)
-
-  !update interpolated velocity 
-  call interp(np,x,y,cell,istatus,'ua',ua)
-  call interp(np,x,y,cell,istatus,'va',va)
-  
-  !nullify pointers
-  nullify(x)
-  nullify(y)
-  deallocate(ua)
-  deallocate(va)
-  nullify(cell)
-  nullify(istatus)
-
-end subroutine advect2D
-
-
-
-!----------------------------------------------------
-! 3-D Advection 
-!----------------------------------------------------
-subroutine advect3D(g,deltaT)
-  type(igroup), intent(inout) :: g
-  real(sp), intent(in) :: deltaT
   real(sp), pointer :: x(:)
   real(sp), pointer :: y(:)
   real(sp), pointer :: s(:)
@@ -608,61 +579,243 @@ subroutine advect3D(g,deltaT)
   real(sp), pointer :: h(:)
   integer , pointer :: cell(:)
   integer , pointer :: istatus(:)
-  real(sp), allocatable :: u(:)
-  real(sp), allocatable :: v(:)
-  real(sp), allocatable :: omega(:)
-  real(sp), allocatable :: zeta(:)
-  integer  :: k,i,np
-
-  !set dimensions for loops and time step
-  np = g%nind
-
-  !set pointers to states 
+  real(sp), dimension(np)  :: zeta
   call get_state('x',g,x)
   call get_state('y',g,y)
   call get_state('s',g,s)
   call get_state('z',g,z)
   call get_state('h',g,h)
+  call get_state('status',g,istatus)
+  call get_state('cell',g,cell)
+
+  call interp(np,x,y,cell,istatus,'zeta',zeta,3)
+  call interp(np,x,y,cell,istatus,'h',h,3)
+  if(sz_cor == 1)then
+     z  = -z + zeta 
+     s  = (z - zeta)/(h + zeta)
+  elseif(sz_cor == 0)then
+     z  = s*(h + zeta) + zeta
+  endif
+  nullify(x)
+  nullify(y)
+  nullify(s)
+  nullify(z)
+  nullify(h)
+  nullify(cell)
+  nullify(istatus)
+
+
+
+end subroutine sz_trans
+
+!---------------------------------------------------
+! 3-D Advection 
+!----------------------------------------------------
+subroutine advect2D(g,deltaT,np)
+  integer, intent(in) :: np
+  integer  :: k,i,ns
+  type(igroup), intent(inout) :: g
+  real(sp), intent(in) :: deltaT
+  real(sp), pointer :: x(:)
+  real(sp), pointer :: y(:)
+  real(sp), pointer :: h(:)
+  integer , pointer :: cell(:)
+  integer , pointer :: istatus(:)
+  
+  real(sp), dimension(np) :: u,u1,u2,v,v1,v2
+  real(sp), dimension(np) :: pdx,pdy
+  real(sp), dimension(np) :: pdxt,pdyt
+
+  real(sp), dimension(np,0:mstage) :: chix,chiy  
+  real(sp), parameter              :: eps  = 1.0E-5
+
+!!!!!!!
+
+  !set dimensions for loops and time step
+  !np = g%nind
+  !set pointers to states
+  call get_state('x',g,x)
+  call get_state('y',g,y)
+  call get_state('h',g,h)
+  call get_state('cell',g,cell)
+  call get_state('status',g,istatus)
+  !--Initialize Stage Functional Evaluations
+  chix = 0.0_sp
+  chiy = 0.0_sp
+  !--Loop over RK Stages
+  do ns=1,mstage
+
+     !!Particle Position at Stage N (x,y,sigma)
+     pdx(:) = x(:)  + a_rk(ns)*deltaT*chix(:,ns-1)
+     pdy(:) = y(:)  + a_rk(ns)*deltaT*chiy(:,ns-1)
+     !!Calculate Velocity Field for Stage N Using C_RK Coefficients
+     !interpolate velocity field to particle position
+  call interp(np,pdx,pdy,cell,istatus,'ua',u1,3)
+  call interp(np,pdx,pdy,cell,istatus,'va',v1,3)
+  call interp(np,pdx,pdy,cell,istatus,'ua',u2,4)
+  call interp(np,pdx,pdy,cell,istatus,'va',v2,4)
+   u  = (1.0_sp-c_rk(ns))*u1 + c_rk(ns)*u2
+   v  = (1.0_sp-c_rk(ns))*v1 + c_rk(ns)*v2
+   chix(:,ns)  = u(:)
+   chiy(:,ns)  = v(:)
+
+end do
+
+  !--Sum Stage Contributions to get Updated Particle Positions-------------------!
+  pdxt(:)  = x(:)
+  pdyt(:)  = y(:)
+  do ns=1,mstage
+     pdxt(:) = pdxt(:) + deltaT*chix(:,ns)*b_rk(ns)*FLOAT(istatus(:))
+     pdyt(:) = pdyt(:) + deltaT*chiy(:,ns)*b_rk(ns)*FLOAT(istatus(:))
+  end do
+ call find_element(np,x,y,cell,istatus)
+  !--Update Only Particle Still in Water
+  x(:)  = x(:)*(1.0_sp - FLOAT(istatus(:))) + pdxt(:)*FLOAT(istatus(:))
+  y(:)  = y(:)*(1.0_SP - FLOAT(istatus(:))) + pdyt(:)*FLOAT(istatus(:))
+
+  !disassociate pointers
+  nullify(x)
+  nullify(y)
+  nullify(h)
+  nullify(cell)
+  nullify(istatus)
+
+end subroutine advect2D
+!---------------------------------------------------
+! 3-D Advection 
+!----------------------------------------------------
+subroutine advect3D(g,deltaT,np,time)
+  integer, intent(in) :: np
+  integer  :: k,i,ns,ni
+  type(igroup), intent(inout) :: g
+  real(sp), intent(in) :: deltaT,time
+  real(sp), pointer :: x(:)
+  real(sp), pointer :: y(:)
+  real(sp), pointer :: s(:)
+  real(sp), pointer :: z(:)
+  real(sp), pointer :: h(:)
+  integer , pointer :: cell(:)
+  integer , pointer :: istatus(:)
+  
+  real(sp), dimension(np) :: u,u1,u2,v,v1,v2,w,w1,w2,wm
+  real(sp), dimension(np) :: zeta,zeta1,zeta2,pdx,pdy,pdz
+  real(sp), dimension(np) :: pdxt,pdyt,pdzt
+
+  real(sp), dimension(np,0:mstage) :: chix,chiy,chiz  
+  real(sp), parameter              :: eps  = 1.0E-5
+  real(sp)  :: diel
+!!!!!!!
+
+  diel=time/3600.0-int(time/3600.0/24.0)*24.0
+  !set dimensions for loops and time step
+  !np = g%nind
+  !set pointers to states
+  call get_state('x',g,x)
+  call get_state('y',g,y)
+  call get_state('s',g,s)
+  call get_state('z',g,z)  
+  call get_state('h',g,h)
   call get_state('cell',g,cell)
   call get_state('status',g,istatus)
 
-  !allocate local data space
-  allocate(zeta(np) ) ; zeta  = 0.0
-  allocate(u(np)    ) ; u     = 0.0
-  allocate(v(np)    ) ; v     = 0.0
-  allocate(omega(np)) ; omega = 0.0
+  !--Initialize Stage Functional Evaluations
+  chix = 0.0_sp
+  chiy = 0.0_sp
+  chiz = 0.0_sp
+  pdx  =x
+  pdy  =y
+  pdz  =s
+  !--Loop over RK Stages
+  do ns=1,mstage
 
-  !interpolate velocity field,depth,free surface to particle position
-  call interp(np,x,y,s,cell,istatus,'u',u)
-  call interp(np,x,y,s,cell,istatus,'v',v)
-  call interp(np,x,y,s,cell,istatus,'omega',omega)
-  call interp(np,x,y,cell,istatus,'h',h)
-  call interp(np,x,y,cell,istatus,'zeta',zeta)
+     !!Particle Position at Stage N (x,y,sigma)
+     pdx(:) = x(:)  + a_rk(ns)*deltaT*chix(:,ns-1)
+     pdy(:) = y(:)  + a_rk(ns)*deltaT*chiy(:,ns-1)
+     pdz(:) = s(:)  + a_rk(ns)*deltaT*chiz(:,ns-1)
 
-  !advance
-  do i=1,np 
-    if(istatus(i) < 1)cycle
-    x(i) = x(i) + alpha(1)*deltaT*u(i)
-    y(i) = y(i) + alpha(1)*deltaT*v(i)
-    s(i) = s(i) + alpha(1)*deltaT*omega(i)/(h(i)+zeta(i)) 
+     !!Adjust Sigma Position to Reflect Off Bottom (Mirroring)
+     pdz = max(pdz,-(2.0+pdz))
+
+     !!Adjust Sigma Position to Remain Below Free Surface
+     pdz = min(pdz,0.0_sp)
+
+     !!Calculate Velocity Field for Stage N Using C_RK Coefficients
+     !interpolate velocity field to particle position
+
+  call interp(np,pdx,pdy,pdz,cell,istatus,'u',u1,3)
+  call interp(np,pdx,pdy,pdz,cell,istatus,'v',v1,3)
+  call interp(np,pdx,pdy,pdz,cell,istatus,'omega',w1,3) !wts means omega
+  call interp(np,pdx,pdy,pdz,cell,istatus,'u',u2,4)
+  call interp(np,pdx,pdy,pdz,cell,istatus,'v',v2,4)
+  call interp(np,pdx,pdy,pdz,cell,istatus,'omega',w2,4)
+  call interp(np,pdx,pdy,cell,istatus,'h',h,3)
+  call interp(np,pdx,pdy,cell,istatus,'zeta',zeta1,3)
+  call interp(np,pdx,pdy,cell,istatus,'zeta',zeta2,4)
+
+   u  = (1.0_sp-c_rk(ns))*u1 + c_rk(ns)*u2
+   v  = (1.0_sp-c_rk(ns))*v1 + c_rk(ns)*v2
+   w  = (1.0_sp-c_rk(ns))*w1 + c_rk(ns)*w2
+   zeta  = (1.0_sp-c_rk(ns))*zeta1  + c_rk(ns)*zeta2
+
+!Added by Xinyou Lin for DVM modelling:WP=WP+WM
+   if(dvm_bio == 1.0)then
+      do ni = 1, np
+       if(6.0 <= diel .and. diel <18.0)then
+        pdzt(ni) = (1 + pdx(ni))*(h(ni)+zeta(ni))  
+        w(ni) = w(ni) + 0.0075*tanh((pdzt(ni) -  2)*3.14159)
+       else
+        pdzt(ni) = -pdx(ni)*(h(ni)+zeta(ni))
+        w(ni) = w(ni) + 0.0075*tanh((pdzt(ni) - 15)*3.14159)
+       endif
+       enddo
+   endif
+!///////////////////////
+
+   chix(:,ns)  = u(:)
+   chiy(:,ns)  = v(:)
+   chiz(:,ns)  = w(:)/(h(:)+zeta(:))  !delta_sigma/deltaT = ww/D
+     !!Limit vertical motion in very shallow water
+     where( (h + zeta) < eps)
+        chiz(:,ns) = 0.0_sp
+     end where
+
+end do
+
+  !--Sum Stage Contributions to get Updated Particle Positions-------------------!
+  pdxt(:)  = x(:)
+  pdyt(:)  = y(:)
+  pdzt(:)  = s(:)
+  do ns=1,mstage
+     pdxt(:) = pdxt(:) + deltaT*chix(:,ns)*b_rk(ns)*FLOAT(istatus(:))
+     pdyt(:) = pdyt(:) + deltaT*chiy(:,ns)*b_rk(ns)*FLOAT(istatus(:))
+     pdzt(:) = pdzt(:) + deltaT*chiz(:,ns)*b_rk(ns)*FLOAT(istatus(:))
   end do
+ call find_element(np,x,y,cell,istatus)
+  !--Update Only Particle Still in Water
+  x(:)  = x(:)*(1.0_sp - FLOAT(istatus(:))) + pdxt(:)*FLOAT(istatus(:))
+  y(:)  = y(:)*(1.0_SP - FLOAT(istatus(:))) + pdyt(:)*FLOAT(istatus(:))
+  s(:)  = pdzt(:)
+  !--Adjust Depth of Updated Particle Positions----------------------------------!
+  s = max(s,-(2.0+s))                 !Reflect off Bottom
+  s = min(s,0.0_sp)                      !Don t Pierce Free Surface
 
-  !adjust s-coordinate value at surface and bottom boundaries
-  do i=1,np
-    s(i) = max(s(i),-(2.0+s(i))) !mirror bottom
-    s(i) = min(s(i),0.0)         !stay below fs
-  end do
+  !--Evaluate Bathymetry and Free Surface Height at Updated Particle Position----!
+  call interp(np,x,y,cell,istatus,'h',h,4)
+  call interp(np,x,y,cell,istatus,'zeta',zeta,4)
+  !--Sigma adjustment if fixed depth tracking------------------------------------!
+  if(fix_dep == 1)then
+      s = (-zpini)/(h+zeta)  !  THIS IS REALLY PDZN = ((-LAG%ZPIN+EP) - EP)/(HP+EP)
+                             !  WHERE ZPINI IS THE SPECIFIED FIXED DEPTH RELATIVE TO THE SS
+      s = max(s,-1.0_SP)     ! Depth can change though if particle goes into shallower areas
 
-  !calculate z value of particle (for visualization)
-  do i=1,np
-    z(i) = s(i)*(h(i)+zeta(i)) + zeta(i)  
-  end do
+  endif
 
-  !update element containing particle => cell
-  call find_element(np,x,y,cell,istatus)
 
-  !apply boundary conditions => reflect off solid
 
+  !--Calculate Particle Location in Cartesian Vertical Coordinate----------------!
+  z = s*(h+zeta)  + zeta
+
+  
   !disassociate pointers
   nullify(x)
   nullify(y)
@@ -680,8 +833,8 @@ end subroutine advect3D
 !   at particle position [x,y] in cell [cell]
 !   if [istatus] < 0 (inactive) do not interpolate
 !----------------------------------------------------
-subroutine interp_float2D(np,x,y,cell,istatus,vname,v)
-  integer, intent(in)    :: np
+subroutine interp_float2D(np,x,y,cell,istatus,vname,v,iframe)
+  integer, intent(in)    :: np,iframe
   real(sp),intent(in)    :: x(np)
   real(sp),intent(in)    :: y(np)
   integer, intent(in)    :: cell(np)
@@ -691,11 +844,14 @@ subroutine interp_float2D(np,x,y,cell,istatus,vname,v)
   !-------------------------------
   real(sp), pointer :: field(:)  !pointer to FVCOM field 
   integer :: i,vts(3),icell,d1
-
+  !added by xinyou
+  integer  :: e1,e2,e3,n1,n2,n3
+  real(sp) :: xoc,yoc,dvdx,dvdy
+  real(sp) :: e0,ex,ey
   !determine dimension of forcing variable
 
   !point to forcing variable
-  call get_forcing(trim(vname),field) 
+  call get_forcing(trim(vname),field,iframe) 
 
   !determine the dimensions
   d1 = size(field,1)
@@ -706,14 +862,40 @@ subroutine interp_float2D(np,x,y,cell,istatus,vname,v)
     do i=1,np
       icell = cell(i)
       if(istatus(i) < 1 .or. icell == 0)cycle 
-      v(i) = field(icell)
+      e1  = nbe(icell,1)
+      e2  = nbe(icell,2)
+      e3  = nbe(icell,3)
+      xoc = x(i) - xc(icell)
+      yoc = y(i) - yc(icell)
+
+        
+     dvdx = a1u(icell,1)*field(icell)+a1u(icell,2)*field(e1)     &
+          + a1u(icell,3)*field(e2)   +a1u(icell,4)*field(e3)
+     dvdy = a2u(icell,1)*field(icell)+a2u(icell,2)*field(e1)     &
+          + a2u(icell,3)*field(e2)   +a2u(icell,4)*field(e3)
+     v(i) = field(icell) + dvdx*xoc + dvdy*yoc
+
+!      v(i) = field(icell)
+!      v(i) =interp_from_elems(icell,x(i),y(i))     
     end do
   elseif(d1 == N_verts)then !vertex-based 2-D array
     do i=1,np
       icell = cell(i)
       if(istatus(i) < 1 .or. icell == 0)cycle 
-      vts  = tri(icell,1:3)
-      v(i) = interp_from_nodes(icell,x(i),y(i),field(vts))
+     n1  = tri(icell,1)
+     n2  = tri(icell,2)
+     n3  = tri(icell,3)
+     xoc = x(i) - xc(icell)
+     yoc = y(i) - yc(icell)
+     !----Linear Interpolation of Free Surface Height---------------------------------!
+    
+     e0 = aw0(icell,1)*field(n1)+aw0(icell,2)*field(n2)+aw0(icell,3)*field(n3)
+     ex = awx(icell,1)*field(n1)+awx(icell,2)*field(n2)+awx(icell,3)*field(n3)
+     ey = awy(icell,1)*field(n1)+awy(icell,2)*field(n2)+awy(icell,3)*field(n3)
+   v(i) = e0 + ex*xoc + ey*yoc
+
+!      vts  = tri(icell,1:3)
+!      v(i) = interp_from_nodes(icell,x(i),y(i),field(vts))
     end do
   else
     write(*,*)'field has horizontal dimensions that is not nodes or elements'
@@ -728,8 +910,8 @@ end subroutine interp_float2D
 ! interpolation routine 
 !   interp a 3D scalar to particle positions in 3-space
 !----------------------------------------------------
-subroutine interp_float3D(np,x,y,s,cell,istatus,vname,v)
-  integer, intent(in)    :: np
+subroutine interp_float3D(np,x,y,s,cell,istatus,vname,v,iframe)
+  integer, intent(in)    :: np,iframe
   real(sp),intent(in)    :: x(np)
   real(sp),intent(in)    :: y(np)
   real(sp),intent(in)    :: s(np)
@@ -743,10 +925,15 @@ subroutine interp_float3D(np,x,y,s,cell,istatus,vname,v)
   integer  :: i,d1,d2,icell,k1,k2,ktype
   real(sp) :: f1,f2,v1,v2
   integer  :: vts(3)
-
-
+  !added by xinyou
+  integer  :: e1,e2,e3,k,n1,n2,n3
+  real(sp) :: xoc,yoc,dvdx,dvdy,ve01,ve02
+  real(sp) :: e0,ex,ey,ep01,ep02
   !point to forcing variable
-  call get_forcing(trim(vname),field) 
+  !get_forcing is in forcing.f90
+  
+  call get_forcing(trim(vname),field,iframe) 
+  
 
   !determine the dimensions
   d1 = size(field,1)
@@ -767,20 +954,41 @@ subroutine interp_float3D(np,x,y,s,cell,istatus,vname,v)
   !------------------------------------------------
   !interpolate to element-based quantities
   !------------------------------------------------
-  if(d1 == N_elems)then  
+  if(d1 == N_elems)then 
+ 
     do i=1,np
       !set cell containing particle
       icell = cell(i)
-
       !loop if particle dead or out of domain
       if(istatus(i) < 1 .or. icell == 0)cycle 
-
       !determine the vertical layer brackets and interp coeffs
       call get_vert_interpcoefs(icell,s(i),k1,k2,f1,f2,ktype)
+      !xinyou
+      e1  = nbe(icell,1)
+      e2  = nbe(icell,2)
+      e3  = nbe(icell,3)
+      xoc = x(i) - xc(icell)
+      yoc = y(i) - yc(icell)
+        k = k1
+     dvdx = a1u(icell,1)*field(icell,k)+a1u(icell,2)*field(e1,k)     &
+          + a1u(icell,3)*field(e2,k)   +a1u(icell,4)*field(e3,k)
+     dvdy = a2u(icell,1)*field(icell,k)+a2u(icell,2)*field(e1,k)     &
+          + a2u(icell,3)*field(e2,k)   +a2u(icell,4)*field(e3,k)
+     ve01 = field(icell,k) + dvdx*xoc + dvdy*yoc
+        k = k2
+     dvdx = a1u(icell,1)*field(icell,k)+a1u(icell,2)*field(e1,k)     &
+          + a1u(icell,3)*field(e2,k)   +a1u(icell,4)*field(e3,k)
+     dvdy = a2u(icell,1)*field(icell,k)+a2u(icell,2)*field(e1,k)     &
+          + a2u(icell,3)*field(e2,k)   +a2u(icell,4)*field(e3,k)
+     ve02 = field(icell,k) + dvdx*xoc + dvdy*yoc
+ 
+
+       v(i) = f1*ve01 + f2*ve02
+!      v1 = interp_from_elems(icell,x(i),y(i),field(vts,k1))
+!      v2 = interp_from_elems(icell,x(i),y(i),field(vts,k2))
       
       !interpolate
-      v(i) = f1*field(icell,k1) + f2*field(icell,k2)
-
+!      v(i) = f1*field(icell,k1) + f2*field(icell,k2)
     end do
   !------------------------------------------------
   !interpolate to node-based quantities
@@ -796,13 +1004,28 @@ subroutine interp_float3D(np,x,y,s,cell,istatus,vname,v)
  
       !determine the vertical layer brackets and interp coeffs
       call get_vert_interpcoefs(icell,s(i),k1,k2,f1,f2,ktype)
-
+     n1  = tri(icell,1)
+     n2  = tri(icell,2)
+     n3  = tri(icell,3)
+     xoc = x(i) - xc(icell)
+     yoc = y(i) - yc(icell)
+     !----Linear Interpolation of Free Surface Height---------------------------------!
+      k = k1
+     e0 = aw0(icell,1)*field(n1,k)+aw0(icell,2)*field(n2,k)+aw0(icell,3)*field(n3,k)
+     ex = awx(icell,1)*field(n1,k)+awx(icell,2)*field(n2,k)+awx(icell,3)*field(n3,k)
+     ey = awy(icell,1)*field(n1,k)+awy(icell,2)*field(n2,k)+awy(icell,3)*field(n3,k)
+   ep01 = e0 + ex*xoc + ey*yoc
+      k = k2
+     e0 = aw0(icell,1)*field(n1,k)+aw0(icell,2)*field(n2,k)+aw0(icell,3)*field(n3,k)
+     ex = awx(icell,1)*field(n1,k)+awx(icell,2)*field(n2,k)+awx(icell,3)*field(n3,k)
+     ey = awy(icell,1)*field(n1,k)+awy(icell,2)*field(n2,k)+awy(icell,3)*field(n3,k)
+   ep02 = e0 + ex*xoc + ey*yoc
+   v(i) = f1*ep01 + f2*ep02
       !set vertices surrounding triangle
-      vts  = tri(icell,1:3)
-      v1 = interp_from_nodes(icell,x(i),y(i),field(vts,k1))
-      v2 = interp_from_nodes(icell,x(i),y(i),field(vts,k2))
-      v(i) = f1*v1 + f2*v2
-
+      !vts  = tri(icell,1:3)
+      !v1 = interp_from_nodes(icell,x(i),y(i),field(vts,k1))
+      !v2 = interp_from_nodes(icell,x(i),y(i),field(vts,k2))
+      !v(i) = f1*v1 + f2*v2
       if(trim(vname)=='khh')then
         write(*,*)'interpping kh'
         write(*,*)i,s(i),k1,k2,v1,v2,f1,f2
@@ -839,9 +1062,9 @@ subroutine find_element(np,x,y,cell,istatus,option)
 
     !failed, try a robust find
     cell(p) = find_element_robust(x(p),y(p)) 
+    if(cell(p) /= 0)cycle
 
     !failed, update status to lost
-    if(cell(p) /= 0)cycle
     istatus(p) = EXITED
   end do
 
@@ -983,7 +1206,7 @@ function find_element_robust(xp,yp) result(elem)
 
    my_sloc = max(sloc,-one)
    my_sloc = min(sloc,-tinynum)
-
+   ! N_lev = N_lay + 1
    !level-based data 
    if(ktype == level_based)then
      do k=1,N_lev 
@@ -1024,5 +1247,205 @@ function find_element_robust(xp,yp) result(elem)
      stop
    endif
  end subroutine get_vert_interpcoefs
+
+ subroutine   TRIANGLE_GRID_EDGE
+  INTEGER, ALLOCATABLE, DIMENSION(:,:) :: TEMP,NB_TMP,CELLS,NBET
+  INTEGER, ALLOCATABLE, DIMENSION(:)   :: CELLCNT
+  INTEGER                              :: I,J,II,JJ,NTMP,NCNT,NFLAG,JJB
+  INTEGER                              :: N1,N2,N3,J1,J2,J3,MX_NBR_ELEM 
+
+  !----------------------------INITIALIZE----------------------------------------!
+
+  ISBCE = 0
+  ISONB = 0
+  NBE   = 0
+  !----DETERMINE NBE(i=1:n,j=1:3): INDEX OF 1 to 3 NEIGHBORING ELEMENTS----------!
+  
+  ALLOCATE(NBET(N_elems,3)) ; NBET = 0
+  ALLOCATE(CELLS(N_verts,50)) ; CELLS = 0
+  ALLOCATE(CELLCNT(N_verts))  ; CELLCNT = 0
+  DO I=1,N_elems
+     N1 = tri(I,1) ; CELLCNT(N1) = CELLCNT(N1)+1
+     N2 = tri(I,2) ; CELLCNT(N2) = CELLCNT(N2)+1
+     N3 = tri(I,3) ; CELLCNT(N3) = CELLCNT(N3)+1
+     CELLS(tri(I,1),CELLCNT(N1)) = I
+     CELLS(tri(I,2),CELLCNT(N2)) = I
+     CELLS(tri(I,3),CELLCNT(N3)) = I
+  END DO
+  DO I=1,N_elems
+     N1 = tri(I,1)
+     N2 = tri(I,2)
+     N3 = tri(I,3)
+     DO J1 = 1,CELLCNT(N1)
+        DO J2 = 1,CELLCNT(N2)
+           IF((CELLS(N1,J1) == CELLS(N2,J2)).AND. CELLS(N1,J1) /= I)NBE(I,3) = CELLS(N1,J1)
+        END DO
+     END DO
+     DO J2 = 1,CELLCNT(N2)
+        DO J3 = 1,CELLCNT(N3)
+           IF((CELLS(N2,J2) == CELLS(N3,J3)).AND. CELLS(N2,J2) /= I)NBE(I,1) = CELLS(N2,J2)
+        END DO
+     END DO
+     DO J1 = 1,CELLCNT(N1)
+        DO J3 = 1,CELLCNT(N3)
+           IF((CELLS(N1,J1) == CELLS(N3,J3)).AND. CELLS(N1,J1) /= I)NBE(I,2) = CELLS(N3,J3)
+        END DO
+     END DO
+  END DO
+ DEALLOCATE(CELLS,CELLCNT)
+  !   IF(MSR)WRITE(IPT,*)  '!  NEIGHBOR FINDING      :    COMPLETE'
+  !
+  !--ENSURE ALL ELEMENTS HAVE AT LEAST ONE NEIGHBOR------------------------------!
+  !
+  NFLAG = 0
+  DO I=1,N_elems
+     IF(SUM(NBE(I,1:3))==0)THEN
+        NFLAG = 1
+        WRITE(*,*)'ELEMENT ',I,' AT ',XC(I),YC(I),' HAS NO NEIGHBORS'
+        STOP
+     END IF
+  END DO
+  IF(NFLAG == 1) STOP
+  !
+  !----IF ELEMENT ON BOUNDARY SET ISBCE(I)=1 AND ISONB(J)=1 FOR BOUNDARY NODES J-!
+  !
+
+  DO I=1,N_elems
+     IF(MIN(NBE(I,1),NBE(I,2),NBE(I,3))==0)THEN    !!ELEMENT ON BOUNDARY
+        ISBCE(I) = 1
+        IF(NBE(I,1) == 0)THEN
+           ISONB(tri(I,2)) = 1 ; ISONB(tri(I,3)) = 1
+        END IF
+        IF(NBE(I,2) ==0) THEN
+           ISONB(tri(I,1)) = 1 ; ISONB(tri(I,3)) = 1
+        END IF
+        IF(NBE(I,3) ==0) THEN
+           ISONB(tri(I,1)) = 1 ; ISONB(tri(I,2)) = 1
+        END IF
+     END IF
+  END DO
+
+  !==============================================================================|
+  !             DEFINE NTVE, NBVE, NBVT                                          !
+  !                                                                              !
+  ! ntve(1:m):           total number of the surrounding triangles               !
+  !                      connected to the given node                             !
+  ! nbve(1:m, 1:ntve+1): the identification number of surrounding                !
+  !                      triangles with a common node (counted clockwise)        !
+  ! nbvt(1:m,ntve(1:m)): the idenfication number of a given node over            !
+  !                      each individual surrounding triangle(counted            !
+  !                      clockwise)                                              !
+  !==============================================================================|
+
+  !
+  !----DETERMINE MAX NUMBER OF SURROUNDING ELEMENTS------------------------------!
+  !
+  MX_NBR_ELEM = 0
+  DO I=1,N_verts
+     NCNT = 0
+     DO J=1,N_elems
+        IF( FLOAT(tri(J,1)-I)*FLOAT(tri(J,2)-I)*FLOAT(tri(J,3)-I) == 0.0_SP) &
+             NCNT = NCNT + 1
+     END DO
+     MX_NBR_ELEM = MAX(MX_NBR_ELEM,NCNT)
+  END DO
+
+  !
+  !----ALLOCATE ARRAYS BASED ON MX_NBR_ELEM--------------------------------------!
+  !
+  ALLOCATE(NBVE(N_verts,MX_NBR_ELEM+1))
+  ALLOCATE(NBVT(N_verts,MX_NBR_ELEM+1))
+  !
+  !--DETERMINE NUMBER OF SURROUNDING ELEMENTS FOR NODE I = NTVE(I)---------------!
+  !--DETERMINE NBVE - INDICES OF NEIGHBORING ELEMENTS OF NODE I------------------!
+  !--DETERMINE NBVT - INDEX (1,2, or 3) OF NODE I IN NEIGHBORING ELEMENT---------!
+  !
+  DO I=1,N_verts
+     NCNT=0
+     DO J=1,N_elems
+        IF (FLOAT(tri(J,1)-I)*FLOAT(tri(J,2)-I)*FLOAT(tri(J,3)-I) == 0.0_SP)THEN
+           NCNT = NCNT+1
+           NBVE(I,NCNT)=J
+           IF((tri(J,1)-I) == 0) NBVT(I,NCNT)=1
+           IF((tri(J,2)-I) == 0) NBVT(I,NCNT)=2
+           IF((tri(J,3)-I) == 0) NBVT(I,NCNT)=3
+        END IF
+     ENDDO
+     NTVE(I)=NCNT
+  ENDDO
+
+  ALLOCATE(NB_TMP(N_verts,MX_NBR_ELEM+1))
+  DO I=1,N_verts
+     IF(ISONB(I) == 0) THEN
+        NB_TMP(1,1)=NBVE(I,1)
+        NB_TMP(1,2)=NBVT(I,1)
+        DO J=2,NTVE(I)+1
+           II=NB_TMP(J-1,1)
+           JJ=NB_TMP(J-1,2)
+           NB_TMP(J,1)=NBE(II,JJ+1-INT((JJ+1)/4)*3)
+           JJ=NB_TMP(J,1)
+           IF((tri(JJ,1)-I) == 0) NB_TMP(J,2)=1
+           IF((tri(JJ,2)-I) == 0) NB_TMP(J,2)=2
+           IF((tri(JJ,3)-I) == 0) NB_TMP(J,2)=3
+        ENDDO
+
+        DO J=2,NTVE(I)+1
+           NBVE(I,J)=NB_TMP(J,1)
+        ENDDO
+
+        DO J=2,NTVE(I)+1
+           NBVT(I,J)=NB_TMP(J,2)
+        ENDDO
+
+        NTMP=NTVE(I)+1
+        IF(NBVE(I,1) /= NBVE(I,NTMP)) THEN
+           PRINT*, I,'NBVE(I) NOT CORRECT!!'
+           STOP
+        ENDIF
+        IF(NBVT(I,1) /= NBVT(I,NTMP)) THEN
+           PRINT*, I,'NBVT(I) NOT CORRECT!!'
+           STOP
+        END IF
+     ELSE
+        JJB=0
+
+        DO J=1,NTVE(I)
+           JJ=NBVT(I,J)
+           IF(NBE(NBVE(I,J),JJ+2-INT((JJ+2)/4)*3) == 0) THEN
+              JJB=JJB+1
+              NB_TMP(JJB,1)=NBVE(I,J)
+              NB_TMP(JJB,2)=NBVT(I,J)
+           END IF
+        ENDDO
+
+        IF(JJB /= 1) THEN
+           PRINT*, 'ERROR IN ISONB !,I,J', I,J
+           PAUSE
+        END IF
+
+        DO J=2,NTVE(I)
+           II=NB_TMP(J-1,1)
+           JJ=NB_TMP(J-1,2)
+           NB_TMP(J,1)=NBE(II,JJ+1-INT((JJ+1)/4)*3)
+           JJ=NB_TMP(J,1)
+           IF((tri(JJ,1)-I) == 0) NB_TMP(J,2)=1
+           IF((tri(JJ,2)-I) == 0) NB_TMP(J,2)=2
+           IF((tri(JJ,3)-I) == 0) NB_TMP(J,2)=3
+        ENDDO
+
+        DO J=1,NTVE(I)
+           NBVE(I,J)=NB_TMP(J,1)
+           NBVT(I,J)=NB_TMP(J,2)
+        ENDDO
+        NBVE(I,NTVE(I)+1)=0
+
+     END IF
+  END DO
+  DEALLOCATE(NB_TMP)
+
+  RETURN
+
+
+ end subroutine TRIANGLE_GRID_EDGE
 
 End Module Ocean_Model 

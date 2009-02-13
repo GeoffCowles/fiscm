@@ -71,7 +71,8 @@ type dataframe
 end type dataframe
 
 integer         :: now = 3 !frame 3 is current data
-type(dataframe) :: frame(3) 
+integer         :: nex = 4 !frame 4 is next data
+type(dataframe) :: frame(4) 
 
 !overload ">" to be able to compare the order of time frames in time
 interface operator(>)
@@ -102,7 +103,6 @@ subroutine open_forcing_file(ffile_in,fbeg,fend)
 
   msg = "error opening forcing file: "//trim(ffile_in)
   call ncdchk( nf90_open(trim(ffile_in),nf90_nowrite,fid),msg ) 
-
   !set file name and id for this module
   ffile_id   = fid
   ffile = ffile_in
@@ -110,7 +110,6 @@ subroutine open_forcing_file(ffile_in,fbeg,fend)
   !inquire dataset info
   msg = "reading number of dimensions from: "//trim(ffile)
   call ncdchk(nf90_inquire(ffile_id, nDim,nVar,nAtt,uDid,fNum) ,msg)
-
   !determine number of frames in the file (size of uDid)
   uD_extant = 1
   if(uDid /= 0)then
@@ -123,7 +122,6 @@ subroutine open_forcing_file(ffile_in,fbeg,fend)
   msg = "error reading time variable from netcdf file"
   call ncdchk( nf90_inq_varid(ffile_id,'time',varid),msg )
   call ncdchk(nf90_get_var(ffile_id, varid, ftimes),msg)
-
   !read units on time to see if conversion from days to seconds is necessary
   if ( nf90_get_att(ffile_id, varid, 'units', tunits) == nf90_noerr)then
     if(index(tunits,'day') /= 0) ftimes = ftimes*day_2_sec
@@ -152,8 +150,8 @@ subroutine open_forcing_file(ffile_in,fbeg,fend)
   call drawline('-')
   write(*,*)'Opened up model forcing file: ',trim(ffile)
   write(*,*)'number of frames in file: ',uD_extant
-  write(*,*)'forcing begins at:',gettime(int(fbeg))
-  write(*,*)'forcing ends   at:',gettime(int(fend))
+  write(*,*)'forcing begins at:',gettime(int(fbeg)),fbeg
+  write(*,*)'forcing ends   at:',gettime(int(fend)),fend
   call drawline('-')
 
 end subroutine open_forcing_file
@@ -162,10 +160,10 @@ end subroutine open_forcing_file
 ! update the model forcing to time (t)
 !   using linear interpolation
 !========================================================================
-subroutine update_forcing(t)
+subroutine update_forcing(t,iframe0)
   implicit none
   real(sp), intent(in) :: t
-  integer :: i1,i2,i1f,i2f
+  integer :: i1,i2,i1f,i2f,iframe0
   logical inew
 
   call bracket(t,i1,i2) 
@@ -197,7 +195,7 @@ subroutine update_forcing(t)
     endif
   endif
 
-  call interp_two_frames(frame(3),t,frame(1),frame(2))
+  call interp_two_frames(frame(iframe0),t,frame(1),frame(2))
  
 end subroutine update_forcing
 
@@ -212,10 +210,11 @@ subroutine setup_forcing(nvars,varlist)
   integer, intent(in) :: nvars
   character(len=*)    :: varlist(nvars)
   integer i
-  
+write(*,*)varlist  
   frame(1) = frame_(nvars,varlist,1)
   frame(2) = frame_(nvars,varlist,2)
   frame(3) = frame_(nvars,varlist,3)
+  frame(4) = frame_(nvars,varlist,4)
 
   call frame_info(frame(1),FRAME_SETUP)
 
@@ -673,20 +672,20 @@ end function valindx
 ! interface data to outside world through pointer
 !  - 1D, float
 !========================================================================
-subroutine get_forcing_f1(vname,p) 
+subroutine get_forcing_f1(vname,p,iframe) 
   implicit none
   character(len=*) :: vname
   real(sp), pointer :: p(:)
-  integer :: i,ndims
+  integer :: i,ndims,iframe
   integer, allocatable :: dims(:)
 
   !get variable index
-  i = valindx(frame(now),vname)
+  i = valindx(frame(iframe),vname)
 
   !get dimensions
-  ndims = frame(now)%fdata(i)%ndims
+  ndims = frame(iframe)%fdata(i)%ndims
   allocate(dims(ndims)) ; dims = 0
-  dims = frame(now)%fdata(i)%dims
+  dims = frame(iframe)%fdata(i)%dims
 
   if(ndims /= 1)then
     write(*,*)'error in get_forcing_f1'
@@ -696,7 +695,7 @@ subroutine get_forcing_f1(vname,p)
   endif
 
   !set pointer
-  p => frame(now)%fdata(i)%f1
+  p => frame(iframe)%fdata(i)%f1
 
 end subroutine get_forcing_f1
 
@@ -704,20 +703,20 @@ end subroutine get_forcing_f1
 ! interface data to outside world through pointer
 !  - 2D, float
 !========================================================================
-subroutine get_forcing_f2(vname,p) 
+subroutine get_forcing_f2(vname,p,iframe) 
   implicit none
   character(len=*) :: vname
   real(sp), pointer :: p(:,:)
-  integer :: i,ndims
+  integer :: i,ndims,iframe
   integer, allocatable :: dims(:)
 
   !get variable index
-  i = valindx(frame(now),vname)
+  i = valindx(frame(iframe),vname)
 
   !get dimensions
-  ndims = frame(now)%fdata(i)%ndims
+  ndims = frame(iframe)%fdata(i)%ndims
   allocate(dims(ndims)) ; dims = 0
-  dims = frame(now)%fdata(i)%dims
+  dims = frame(iframe)%fdata(i)%dims
 
   if(ndims /= 2)then
     write(*,*)'error in get_forcing_f2'
@@ -727,8 +726,7 @@ subroutine get_forcing_f2(vname,p)
   endif
 
   !set pointer
-  p => frame(now)%fdata(i)%f2
-
+  p => frame(iframe)%fdata(i)%f2
 end subroutine get_forcing_f2
 
 function get_ncfid() result(fid)
@@ -767,6 +765,33 @@ subroutine bracket(t,i1,i2)
 
 end subroutine bracket
   
+subroutine exchange_forcing
+  implicit none
+
+  !----------------------------------------
+  integer  :: ndims,dtype,i
+  integer  :: d1,d2,d3,d4
+
+
+  !loop over vars, exchage frame
+  do i=1,frame(now)%nvars
+    dtype = frame(now)%fdata(i)%dtype
+    ndims = frame(now)%fdata(i)%ndims
+    if(dtype == flt_type)then
+      if(ndims == 1) frame(now)%fdata(i)%f1 = frame(nex)%fdata(i)%f1
+      if(ndims == 2) frame(now)%fdata(i)%f2 = frame(nex)%fdata(i)%f2
+      if(ndims == 3) frame(now)%fdata(i)%f3 = frame(nex)%fdata(i)%f3
+      if(ndims == 4) frame(now)%fdata(i)%f4 = frame(nex)%fdata(i)%f4
+    else
+      if(ndims == 1) frame(now)%fdata(i)%i1 = frame(nex)%fdata(i)%i1
+      if(ndims == 2) frame(now)%fdata(i)%i2 = frame(nex)%fdata(i)%i2
+      if(ndims == 3) frame(now)%fdata(i)%i3 = frame(nex)%fdata(i)%i3
+      if(ndims == 4) frame(now)%fdata(i)%i4 = frame(nex)%fdata(i)%i4
+    endif
+  enddo
+
+
+end subroutine exchange_forcing
 
 
 End Module forcing

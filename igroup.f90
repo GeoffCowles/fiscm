@@ -195,6 +195,7 @@ function group_(fid,id,deltaT) result(g)
   !(status) - spawn time
   fval=0.;call add_state(g,'tspawn','time of spawning','sec',NETCDF_NO,fval)
 
+
 end function group_
 
 !---------------------------------------------------------

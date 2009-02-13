@@ -48,11 +48,11 @@ real(sp) :: BEL_BETA = -2.05
  
 real(sp) :: BEL_ALPHA 
 integer :: BEL_A(13)
-      
-Namelist /NML_COPEPOD/ &
+character*100  INI_BIOF      
+Namelist /NML_COPEPOD/  &
      & BEL_ALPHA,       &
-     & BEL_A            
-
+     & BEL_A,           &   
+     & INI_BIOF
 contains
 
 subroutine init_bio(g,Nind_start)
@@ -60,13 +60,16 @@ subroutine init_bio(g,Nind_start)
        use utilities 
        type(igroup), intent(inout) :: g
        integer,      intent(in)    :: Nind_start
-       integer :: iunit, ios, i, np
+       integer :: iunit, ios, i, np,npoint
        logical :: fexist
        real(sp) , pointer :: tspawn(:)
        real(sp) , pointer :: x(:)
        real(sp) , pointer :: y(:)
        real(sp) , pointer :: s(:)
+       real(sp) , pointer :: z(:)
+       integer  , pointer :: istatus(:)
 
+       real(sp)  tmp
            
       !set current problem size
        if(Nind_start < 0)then
@@ -95,6 +98,7 @@ subroutine init_bio(g,Nind_start)
     stop
   endif
   endif ! file /= NONE
+  close(iunit)
  write(*, nml=nml_copepod)
 
  !------------------------------------
@@ -110,19 +114,71 @@ subroutine init_bio(g,Nind_start)
   if(g%space_dim > 1)then
     call get_state('x',g,x)
     call get_state('y',g,y)
-    call random_square(np,-2500._sp,2500._sp,-2500._sp,2500._sp,x,y)
+    call get_state('status',g,istatus)
+
+!    call random_square(np,-2500._sp,2500._sp,-2500._sp,2500._sp,x,y)
+!    Revised by Xinyou Lin
+  
+  inquire(file=trim(INI_BIOF),exist=fexist)
+  if(.not.fexist)then
+    write(*,*)INI_BIOF ,' does not exist, stopping...'
+    stop
+  endif
+  write(*,*)'initializing x y z using file: ',INI_BIOF
+  open(unit=iunit,file=trim(INI_BIOF),form='formatted')
+  read(iunit,*)npoint
+  if(npoint /= np)then
+   write(*,*)'The number of points are wrong in',INI_BIOF
+   stop
+  endif
+  do i=1,np
+  read(iunit,*) npoint,x(i),y(i)
+  enddo 
+
+
+  close(iunit)
+   istatus=1;
     nullify(x)
     nullify(y)
+    nullify(istatus)
+
   endif
   !-----------------------------------
   ! 3D -> initialize s-coordinate
   !-----------------------------------
   if(g%space_dim > 2)then
     call get_state('s',g,s)
-    do i=1,g%Nind
-      s(i) = -float(i-1)/float(g%Nind-1)
-    end do
+    call get_state('z',g,z)
+!    do i=1,g%Nind
+!      s(i) = -float(i-1)/float(g%Nind-1)
+!    end do
+
+  open(unit=iunit,file=trim(INI_BIOF),form='formatted')
+  read(iunit,*)npoint
+
+  if(npoint /= np)then
+   write(*,*)'The number of points are wrong in',INI_BIOF
+   stop
+  endif
+  if(sz_cor == 1) then
+  allocate(zpini(np))
+  allocate(zptini(np))
+  endif 
+  do i=1,np
+  read(iunit,*) npoint,tmp,tmp,zpini(i),zptini(i)
+  if(sz_cor == 0)then
+  s(i) = zpini(i)
+  elseif(sz_cor == 1)then
+  z(i) = zpini(i)
+  endif
+! hours to seconds
+  enddo
+ 
+  zptini=zptini*3600.0
+  close(iunit)
     nullify(s)
+    nullify(z)
+
   endif
 
 

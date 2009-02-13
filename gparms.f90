@@ -125,11 +125,16 @@ integer, parameter :: VDIFF_NONE     = 0
 integer, parameter :: VDIFF_VARIABLE = 1
 integer, parameter :: VDIFF_SPLINED  = 2
 integer, parameter :: VDIFF_BINNED   = 3
+!-model setup----------------------------------------------------
+integer, parameter ::  sz_cor     = 1  ! 0 - input s ;1 - input z
+integer, parameter :: fix_dep     = 1  ! 0 - unfixed ;1 - fix(dep)
+integer, parameter :: dvm_bio     = 0  ! 0 - nodvm   ;1 - dvm(bio)
+real   , allocatable :: zpini(:),zptini(:)
 
 !----------------------------------------------------------------
-! version 
 !----------------------------------------------------------------
-character(len=fstr) :: FISCM_VERSION = "fiscm1.0"
-
+! version & var character name 
+!----------------------------------------------------------------
+character(len=fstr) :: FISCM_VERSION= "fiscm1.0"
 
 End Module Gparms

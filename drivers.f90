@@ -17,16 +17,29 @@ use bio
 
 implicit none
 contains
+!  s from z initialization
+subroutine sz_ini(ng,g)
+  integer     , intent(in   ) :: ng
+  type(igroup), intent(inout), dimension(ng) :: g
+  integer   :: n,np
+
+   do n=1,ng
+    np = g(n)%nind
+    if(g(n)%space_dim == 3)then
+    call sz_trans(np,g(n))
+    endif
+   end do
+end subroutine  
 
 !----------------------------------------------------
 ! advection-diffusion driver
 !   call the appropriate advection and diffusion
 !   routines, group-dependent
 !----------------------------------------------------
-subroutine do_adv_diff(ng,g,dT)
+subroutine do_adv_diff(ng,g,dT,time)
   integer     , intent(in   ) :: ng
   type(igroup), intent(inout), dimension(ng) :: g
-  real(sp), intent(in) :: dT
+  real(sp), intent(in) :: dT,time
   integer :: n,np
   real(sp), pointer :: x(:)
   real(sp), pointer :: y(:)
@@ -46,13 +59,13 @@ subroutine do_adv_diff(ng,g,dT)
     !--------------------------------------------------------------------
     case(2) ! 2D Problem
     !--------------------------------------------------------------------
-      call advect2D( g(n) , dT)
+      call advect2D( g(n) , dT,g(n)%nind)
       if(g(n)%hdiff_type == HDIFF_CONSTANT) call rw_hdiff_constant( g(n) ,dT) 
       if(g(n)%hdiff_type == HDIFF_VARIABLE) call rw_hdiff_variable( g(n),dT)
     !--------------------------------------------------------------------
     case(3) ! 3D Problem
     !--------------------------------------------------------------------
-      call advect3D( g(n) ,dT)
+      call advect3D( g(n) ,dT ,g(n)%nind,time)
       if(g(n)%hdiff_type == HDIFF_CONSTANT) call rw_hdiff_constant( g(n) ,dT) 
       if(g(n)%hdiff_type == HDIFF_VARIABLE) call rw_hdiff_variable( g(n),dT)
       if(g(n)%vdiff_type == VDIFF_VARIABLE) call rw_vdiff(g(n), dT, g(n)%vdiff_substeps)  
@@ -91,8 +104,8 @@ end subroutine do_bio
 !---------------------------------------------------------
 ! driver to interpolate forcing onto particle positions 
 !---------------------------------------------------------
-subroutine interp_forcing(ng,g)
-  integer     , intent(in   ) :: ng
+subroutine interp_forcing(ng,g,iframe)
+  integer     , intent(in   ) :: ng,iframe
   type(igroup), intent(inout), dimension(ng) :: g
   real(sp), pointer :: x(:)
   real(sp), pointer :: y(:)
@@ -142,15 +155,16 @@ subroutine interp_forcing(ng,g)
       endif
    
       !interpolate - 2D
+      !interp in fvcom_drivers.f90
       if(g(n)%space_dim == 2)then
         if(vtype == flt_type)then
-          call interp(g(n)%nind,x,y,cell,istatus,evar,f)
+          call interp(g(n)%nind,x,y,cell,istatus,evar,f,iframe)
         elseif(vtype == int_type)then
         !  call interp(g(n)%nind,x,y,cell,istatus,evar,i)
         endif
       else !3D
         if(vtype == flt_type)then
-          call interp(g(n)%nind,x,y,s,cell,istatus,evar,f)
+          call interp(g(n)%nind,x,y,s,cell,istatus,evar,f,iframe) 
         elseif(vtype == int_type)then
         !  call interp(g(n)%nind,x,y,s,cell,istatus,evar,i)
         endif
@@ -223,6 +237,7 @@ subroutine activate(ng,g,t,direction)
       np = g(n)%nind
       do p=1,np
         if(istatus(p) == UNKNOWN .and. t >= tspawn(p)) istatus(p) = ACTIVE
+        if(t <= zptini(p)) istatus(p) = UNKNOWN
       end do
     end do
   !reverse model
@@ -233,6 +248,8 @@ subroutine activate(ng,g,t,direction)
       np = g(n)%nind
       do p=1,np
         if(istatus(p) == 0 .and. t <= tspawn(p)) istatus(p) = 1
+        if(t >= zptini(p)) istatus(p) = UNKNOWN
+
       end do
     end do
   endif

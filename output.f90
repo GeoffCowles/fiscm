@@ -108,7 +108,6 @@ subroutine write_header(g)
 
   !close the file
   call cfcheck( nf90_close(g%fid_out) )
-
 end subroutine write_header
   
 !-----------------------------------------------

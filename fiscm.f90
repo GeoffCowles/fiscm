@@ -7,7 +7,6 @@
 ! !REVISION HISTORY:                   
 !  Original author(s): G. Cowles 
 !=======================================================================
-! test rji
 Module fiscm_data
   use gparms
   use mod_igroup
@@ -69,6 +68,7 @@ Program fiscm
   !----------------------------------------------------------
   do n=1,ngroups
     if(igroups(n)%biology)call init_bio(igroups(n),igroups(n)%Tnind)
+
   end do
 
   !----------------------------------------------------------
@@ -87,6 +87,7 @@ Program fiscm
   call get_ext_varnames(ngroups,igroups,nvars,needvars)
   call ocean_model_init(ngroups,igroups,nvars,needvars)
   call get_unique_strings(nvars,needvars,uniqvars);nvars = uniqvars
+
   if(nvars > 0 .and. maxval(igroups%space_dim) > 1)call setup_forcing(nvars,needvars)
 
   !----------------------------------------------------------
@@ -109,7 +110,12 @@ Program fiscm
   ! ensure times (spawning, simulation, forcing)
   ! are compatible
   !----------------------------------------------------------
-  call get_spawn_range(ngroups,igroups,tsmin,tsmax)
+  !tsmin=121.0*24.*3600.
+  !tsmax=130.0*24.*3600.
+   tsmin=beg_time
+   tsmax=end_time
+  !call get_spawn_range(ngroups,igroups,tsmin,tsmax)
+write(*,*)beg_time,end_time,tsmin,tsmax,fbeg,fend
   call check_times(beg_time,end_time,tsmin,tsmax,fbeg,fend)
 
   !===================================================================
@@ -119,32 +125,37 @@ Program fiscm
 
   t = beg_time
   nits = (end_time-beg_time)/deltaT+1
+    !---------------------------------------------------------
+   if(maxval(igroups%space_dim) > 1) then
+    call update_forcing(t,3)
+    call sz_ini(ngroups,igroups)
+    call activate(ngroups,igroups,t,sim_direction)
+    call interp_forcing(ngroups,igroups,3) 
+    call cdf_out(ngroups,igroups,its,t,NCDO_OUTPUT)
+    call do_bio(ngroups,igroups,t,its)
+    !---------------------------------------------------------
+    !call exchange_forcing
+    endif
   do its=1,nits
 
+      t = t + deltaT
     !---------------------------------------------------------
     ! update forcing to time t    
     !---------------------------------------------------------
-    if(maxval(igroups%space_dim) > 1) call update_forcing(t) 
+    if(maxval(igroups%space_dim) > 1) call update_forcing(t,4) 
 
     !---------------------------------------------------------
     ! check for activation through spawning 
     !---------------------------------------------------------
     call activate(ngroups,igroups,t,sim_direction) 
-
     !---------------------------------------------------------
     ! advect and diffuse particles 
     !---------------------------------------------------------
-    call do_adv_diff(ngroups,igroups,deltaT)
-
+    call do_adv_diff(ngroups,igroups,deltaT,t)
     !---------------------------------------------------------
     ! interpolate external vars at new particle positions 
     !---------------------------------------------------------
-    call interp_forcing(ngroups,igroups)
-
-    !---------------------------------------------------------
-    ! advance the biology in time 
-    !---------------------------------------------------------
-    call do_bio(ngroups,igroups,t,its)
+    call interp_forcing(ngroups,igroups,4) !4 is new current field
 
     !---------------------------------------------------------
     ! output the particle states to a NetCDF file 
@@ -158,10 +169,16 @@ Program fiscm
       if(.not. checkstatus(ngroups,igroups,t))exit
     endif
 
+
+    !---------------------------------------------------------
+    ! advance the biology in time 
+    !---------------------------------------------------------
+    call do_bio(ngroups,igroups,t,its)
     !---------------------------------------------------------
     ! update the time step 
     !---------------------------------------------------------
-    t = t + deltaT
+    !t = t + deltaT
+    call exchange_forcing
 
   end do
   !===================================================================

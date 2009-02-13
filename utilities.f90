@@ -132,23 +132,18 @@ function gettime(insecs) result(instring)
    real(sp) :: x3(2)
    real(sp) :: p(2)
    !----------------------------------
-
-   isintriangle = .false.
-
-   if(y0 < minval(yt) .or. y0 > maxval(yt)) then
-     isintriangle = .false.
-     return
-   endif
-   if(x0 < minval(xt) .or. x0 > maxval(xt)) then
-     isintriangle = .false.
-     return
-   endif
+   !revised by Xinyou Lin
+    isintriangle = .true.
 
    f1 = (y0-yt(1))*(xt(2)-xt(1)) - (x0-xt(1))*(yt(2)-yt(1))
+   f1 = f1*((yt(3)-yt(1))*(xt(2)-xt(1)) - (xt(3)-xt(1))*(yt(2)-yt(1)))  
    f2 = (y0-yt(3))*(xt(1)-xt(3)) - (x0-xt(3))*(yt(1)-yt(3))
-   f3 = (y0-yt(2))*(xt(3)-xt(2)) - (x0-xt(2))*(yt(3)-yt(2))
-   if(f1*f3 >= 0.0_sp .and. f3*f2 >= 0.0_sp) isintriangle = .true.
+   f2 = f2*((yt(2)-yt(3))*(xt(1)-xt(3)) - (xt(2)-xt(3))*(yt(1)-yt(3)))
 
+   f3 = (y0-yt(2))*(xt(3)-xt(2)) - (x0-xt(2))*(yt(3)-yt(2))
+   f3 =f3*((yt(1)-yt(2))*(xt(3)-xt(2)) - (xt(1)-xt(2))*(yt(3)-yt(2)))
+
+   if(f1 <0.0_sp .or. f2 <0.0_sp .or.f3 <0.0_sp ) isintriangle = .false.
    return
    end function isintriangle
 
@@ -273,7 +268,7 @@ function gettime(insecs) result(instring)
       flag=0 
     endif 
     
-    normal=tmp*sigma+mean 
+    normal=tmp*sigma+mean !tmp is distribution of standard normal
     return 
   end function normal
 
@@ -342,8 +337,7 @@ function gettime(insecs) result(instring)
         sig=(x(i)-x(i-1))/(x(i+1)-x(i-1))
         p=sig*ysp(i-1)+2.
         ysp(i)=(sig-1.)/p
-        !u(i)=(6.*((y(i+1)-y(i))/(x(i+1)-x(i))-(y(i)-y(i-1))/(x(i)-x(i-1)))/(x(i+1)-x(i-1))--sig*u(i-1))/p
-        u(i)=(6.*((y(i+1)-y(i))/(x(i+1)-x(i))-(y(i)-y(i-1))/(x(i)-x(i-1)))/(x(i+1)-x(i-1))+sig*u(i-1))/p
+        u(i)=(6.*((y(i+1)-y(i))/(x(i+1)-x(i))-(y(i)-y(i-1))/(x(i)-x(i-1)))/(x(i+1)-x(i-1))--sig*u(i-1))/p
      end do
      if (ypn.gt..99e30) then
         qn=0.
