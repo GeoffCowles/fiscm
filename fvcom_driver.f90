@@ -761,10 +761,10 @@ subroutine advect3D(g,deltaT,np,time)
    if(dvm_bio == 1.0)then
       do ni = 1, np
        if(6.0 <= diel .and. diel <18.0)then
-        pdzt(ni) = (1 + pdx(ni))*(h(ni)+zeta(ni))  
-        w(ni) = w(ni) + 0.0075*tanh((pdzt(ni) -  2)*3.14159)
+        pdzt(ni) = (1 + pdz(ni))*(h(ni)+zeta(ni))  
+        w(ni) = w(ni) + 0.0075*tanh((pdzt(ni) -  1)*3.14159)
        else
-        pdzt(ni) = -pdx(ni)*(h(ni)+zeta(ni))
+        pdzt(ni) = -pdz(ni)*(h(ni)+zeta(ni))
         w(ni) = w(ni) + 0.0075*tanh((pdzt(ni) - 15)*3.14159)
        endif
        enddo
