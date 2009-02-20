@@ -1,0 +1,107 @@
+&NML_FISCM
+ beg_time_days   = 1.0,
+ end_time_days   = 365.0,     
+ deltaT          = 120.,
+ ireport         = 30,
+ ngroups         = 1,
+ nfiles_in       = 4,
+ forcing_file    =   '/bloom/data0/mem2/arctic/data/glb_pan_avg_0001_01.nc','/bloom/data0/mem2/arctic/data/glb_pan_avg_0002_01.nc','/bloom/data0/mem2/arctic/data/glb_pan_avg_0003_01.nc','/bloom/data0/mem2/arctic/data/glb_pan_avg_0004_01.nc',
+ spherical       = 1,
+ sz_cor          = 1,
+ fix_dep         = 1,
+ dvm_bio         = 0,
+ wind_type       = 0,
+ dvmh_up         = 15.0,
+ dvmh_dn         = 1.0
+/
+
+&NML_NCVAR
+           x_char  ='x',
+           y_char  ='y',
+           h_char  ='h',   
+          nv_char  ='nv',   
+        nele_char  ='nele',   
+        node_char  ='node',   
+         aw0_char  ='aw0',   
+         awx_char  ='awx',   
+         awy_char  ='awy',   
+         a1u_char  ='a1u',   
+         a2u_char  ='a2u',   
+      siglay_char  ='siglay',   
+      siglev_char  ='siglev',   
+          ua_char  ='ua',   
+          va_char  ='va',   
+        zeta_char  ='zeta',   
+           h_char  ='h',   
+          wu_char  ='windu',   
+          wv_char  ='windv',   
+           u_char  ='u',   
+           v_char  ='v',   
+       omega_char  ='ww',   
+          kh_char  ='km'
+/
+
+
+
+ &NML_GROUP
+ Tnind            = 6030,
+ space_dim        = 3,
+ group_name       = 'C. finmarchicus', 
+ hdiff_type       = 1,
+ hdiff_const_val  = 10.,
+ vdiff_type       = 1,
+ vdiff_const_val  = 0.0,
+ vdiff_substeps   = 5
+ intvl_bio        = 30,
+ biology          = T,
+ intvl_out        = 30,
+ start_out        = 0.0,
+ nstate           = 4,
+ statefile        = 'cpp.nml',
+ paramfile        = 'cfin.nml'
+/
+
+
+ &NML_STATEVAR
+ state_varname          = 'PASD',
+ state_longname         = 'Model Currency',
+ state_units            = '-',
+ state_netcdf_out       = 1,
+ state_vartype          = 2,
+ state_initval_int      = 1,
+ state_initval_flt      = 1.0,
+ state_from_ext_var     = 'NONE'
+/
+ &NML_STATEVAR
+ state_varname          = 'T',
+ state_longname         = 'temperature',
+ state_units            = 'C',
+ state_netcdf_out       = 1,
+ state_vartype          = 2,
+ state_initval_int      = 1,
+ state_initval_flt      = 12.0,
+ state_from_ext_var     = 'temp'
+/
+
+ &NML_STATEVAR
+ state_varname          = 'stage',
+ state_longname         = 'morphological stage',
+ state_units            = '-',
+ state_netcdf_out       = 1,
+ state_vartype          = 1,
+ state_initval_int      = 1,
+ state_initval_flt      = 1.0,
+ state_from_ext_var     = 'NONE'
+/
+
+ &NML_STATEVAR
+ state_varname          = 'diapause',
+ state_longname         = 'diapause flag',
+ state_units            = '-',
+ state_netcdf_out       = 1,
+ state_vartype          = 1,
+ state_initval_int      = 1,
+ state_initval_flt      = 1.0,
+ state_from_ext_var     = 'NONE'
+/
+
