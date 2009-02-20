@@ -120,21 +120,27 @@ integer, parameter :: ACTIVE = 1
 !----------------------------------------------------------------
 integer, parameter :: HDIFF_NONE     = 0
 integer, parameter :: HDIFF_CONSTANT = 1
-integer, parameter :: HDIFF_VARIABLE = 2
+integer, parameter :: HDIFF_VARIABLE = 2     !unfinished
 integer, parameter :: VDIFF_NONE     = 0
 integer, parameter :: VDIFF_VARIABLE = 1
-integer, parameter :: VDIFF_SPLINED  = 2
-integer, parameter :: VDIFF_BINNED   = 3
-!-model setup----------------------------------------------------
-integer, parameter ::  sz_cor     = 1  ! 0 - input s ;1 - input z
-integer, parameter :: fix_dep     = 1  ! 0 - unfixed ;1 - fix(dep)
-integer, parameter :: dvm_bio     = 0  ! 0 - nodvm   ;1 - dvm(bio)
-real   , allocatable :: zpini(:),zptini(:)
-
+integer, parameter :: VDIFF_SPLINED  = 2     !unfinished
+integer, parameter :: VDIFF_BINNED   = 3     !unfinished
+!-model setup control parameters----------------------------------------------------
+integer, parameter :: max_nf = 100 
+real(sp), PARAMETER :: tpi  =3.14159265/180.0*6371.*1000.
+integer :: spherical   != 0  ! 0 - x y(m)  ;1 - lon lat(deg)
+integer ::  sz_cor     != 1  ! 0 - input s ;1 - input z
+integer :: fix_dep     != 0  ! 0 - unfixed ;1 - fix(dep)
+integer :: dvm_bio     != 1  ! 0 - nodvm   ;1 - dvm(bio)
+integer :: wind_type   != 0  ! 0 - nowind  ;1 - wind
+real(sp)    :: dvmh_up,dvmh_dn  ! up-from surface;dn-from bottom
+real(sp)   , allocatable :: zpini(:),zptini(:)
+ character(len=fstr) :: runcontrol
 !----------------------------------------------------------------
 !----------------------------------------------------------------
 ! version & var character name 
 !----------------------------------------------------------------
+
 character(len=fstr) :: FISCM_VERSION= "fiscm1.0"
 
 End Module Gparms

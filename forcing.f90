@@ -33,15 +33,17 @@ integer, parameter :: FRAME_SETUP = 0
 integer, parameter :: FRAME_STATS = 1
 
 integer, private :: ffile_id,nDim,nVar,nAtt,uDid,fNum,uD_extant
-character(len=fstr), private :: ffile
+character(len=fstr), private :: ffile(max_nf)
 
 real(sp) :: forcing_beg_time
 real(sp) :: forcing_end_time
 real(sp) :: forcing_deltaT
 integer  :: nframes
 integer  :: lasti1,lasti2 
-real(sp), allocatable :: ftimes(:)
-
+real(sp), allocatable :: ftimes(:),tmptime(:)
+integer , allocatable :: fid_ft(:)
+integer , allocatable :: rec_ft(:)
+integer , allocatable :: fnr_ft(:)
 type container
   integer :: dtype
   integer :: ttype
@@ -85,76 +87,6 @@ interface get_forcing
 end interface
 
 contains
-
-!========================================================================
-! open the forcing file  
-!   - make sure it exists
-!   - read time (convert to sec if nec.)
-!========================================================================
-subroutine open_forcing_file(ffile_in,fbeg,fend) 
-  use utilities
-  implicit none
-  character(len=*) :: ffile_in
-  real(sp), intent(out) :: fbeg,fend
-  integer :: fid
-  character(len=mstr) :: msg
-  character(len=fstr) :: dname,tunits
-  integer :: varid,i,ierr
-
-  msg = "error opening forcing file: "//trim(ffile_in)
-  call ncdchk( nf90_open(trim(ffile_in),nf90_nowrite,fid),msg ) 
-  !set file name and id for this module
-  ffile_id   = fid
-  ffile = ffile_in
-
-  !inquire dataset info
-  msg = "reading number of dimensions from: "//trim(ffile)
-  call ncdchk(nf90_inquire(ffile_id, nDim,nVar,nAtt,uDid,fNum) ,msg)
-  !determine number of frames in the file (size of uDid)
-  uD_extant = 1
-  if(uDid /= 0)then
-    call ncdchk(nf90_inquire_dimension(ffile_id, uDid, dname, uD_extant ))
-  endif
-
-  !allocate space to hold times and read in 
-  nframes = uD_extant
-  allocate(ftimes(nframes)) ; ftimes = 0.0
-  msg = "error reading time variable from netcdf file"
-  call ncdchk( nf90_inq_varid(ffile_id,'time',varid),msg )
-  call ncdchk(nf90_get_var(ffile_id, varid, ftimes),msg)
-  !read units on time to see if conversion from days to seconds is necessary
-  if ( nf90_get_att(ffile_id, varid, 'units', tunits) == nf90_noerr)then
-    if(index(tunits,'day') /= 0) ftimes = ftimes*day_2_sec
-    write(*,*)'%%%%%% converting netcdf time units to seconds!!!!'
-  endif
-  
-  
-
-  !set begin/end/deltaT from forcing
-  !make sure time is sequential
-  forcing_beg_time = ftimes(1)
-  forcing_end_time = ftimes(nframes)
-
-  if(nframes > 1)then
-    do i=2,nframes
-      if(ftimes(i)-ftimes(i-1) <= 0.0)then
-        write(*,*)'netcdf time is not monotonically increasing'
-      endif
-    end do
-  endif
-
-  !set fbeg/fend to return val
-  fbeg = forcing_beg_time
-  fend = forcing_end_time
-    
-  call drawline('-')
-  write(*,*)'Opened up model forcing file: ',trim(ffile)
-  write(*,*)'number of frames in file: ',uD_extant
-  write(*,*)'forcing begins at:',gettime(int(fbeg)),fbeg
-  write(*,*)'forcing ends   at:',gettime(int(fend)),fend
-  call drawline('-')
-
-end subroutine open_forcing_file
 
 !========================================================================
 ! update the model forcing to time (t)
@@ -304,7 +236,8 @@ function frame_(nvars,varlist,id) result(frame)
   frame%nvars  = nvars
   frame%time   = -hugenum
   frame%iframe = -1
-
+  ffile_id=fid_ft(1)
+  
   !return if nvars = 0
   if(nvars < 1)return
   
@@ -312,7 +245,7 @@ function frame_(nvars,varlist,id) result(frame)
   do i=1,nvars
     if(debug)write(*,*)'making sure: ',trim(varlist(i)),' exists'
     msg  = "error: var ["//trim(varlist(i))//"]"
-    msg2 = " not found in "//trim(ffile)
+    msg2 = " not found in "//trim(ffile(1))
     call ncdchk( nf90_inq_varid(ffile_id,varlist(i),varids(i)),msg,msg2 ) 
   end do
 
@@ -381,11 +314,11 @@ subroutine read_frame(frame,f)
 
 
   !make sure frame is in bounds
-  if(f > uD_extant .or. f < 1)then
+  if(f > nframes .or. f < 1)then
     write(*,*)'error in read_frame'
     write(*,*)'fatal error in read_frame'
-    write(*,*)'cannot read frame: ',f,' from file: ',trim(ffile)
-    write(*,*)'max frames in netcdf file is: ',uD_extant
+    write(*,*)'cannot read frame: ',f,' from file: ',trim(ffile(fnr_ft(f)))
+    write(*,*)'max frames in netcdf file is: ',nframes
     stop 
   endif
   frame%iframe = f
@@ -402,7 +335,7 @@ subroutine read_frame(frame,f)
     varid = frame%fdata(i)%varid
     ndims = frame%fdata(i)%ndims
     ttype = frame%fdata(i)%ttype
-    
+    ffile_id=fid_ft(f)    
 
     !static var, read in entirety 
     if(ttype == CONSTANT)then
@@ -418,7 +351,7 @@ subroutine read_frame(frame,f)
       allocate(vsize(ndims+ttype))
       start(1:ndims) = 1
       vsize(1:ndims) = frame%fdata(i)%dims(1:ndims)
-      start(ndims+1) = f
+      start(ndims+1) = rec_ft(f)
       vsize(ndims+1) = 1
       if(ndims==1) call ncdchk( nf90_get_var(ffile_id, varid, frame%fdata(i)%f1,start,vsize) )
       if(ndims==2) call ncdchk( nf90_get_var(ffile_id, varid, frame%fdata(i)%f2,start,vsize) )
@@ -462,7 +395,7 @@ subroutine interp_two_frames(frame,t,frame1,frame2) !result(frame)
     c1 = (t - t2)/(t1-t2)
     c2 = 1.-c1
   endif
-  
+ 
   !loop over vars, interpolate to intermediate frame 
   do i=1,frame1%nvars
     dtype = frame1%fdata(i)%dtype
@@ -792,6 +725,103 @@ subroutine exchange_forcing
 
 
 end subroutine exchange_forcing
+
+!========================================================================
+! open the forcing file  
+!   - make sure it exists
+!   - read time (convert to sec if nec.)
+!========================================================================
+subroutine open_forcing_file(ffiles_in,nfls,fbeg,fend) 
+  use utilities
+  implicit none
+  integer, intent(in) :: nfls
+  character(len=fstr) :: ffiles_in(nfls)
+  integer :: nfsfid(nfls),nfsnrec(nfls)
+  character(len=fstr) :: ffile_in
+  real(sp), intent(out) :: fbeg,fend
+  integer :: fid
+  character(len=mstr) :: msg
+  character(len=fstr) :: dname,tunits
+  integer :: varid,i,ierr,n
+  
+  nframes=0 
+  do n=1,nfls
+  ffile_in=ffiles_in(n) !maybe it goes wrong
+write(*,*)ffile_in
+  msg = "error opening forcing file: "//trim(ffile_in)
+  call ncdchk( nf90_open(trim(ffile_in),nf90_nowrite,fid),msg ) 
+  !set file name and id for this module
+  nfsfid(n)   = fid
+  ffile(n) = ffile_in
+
+  !inquire dataset info
+  msg = "reading number of dimensions from: "//trim(ffile_in)
+  call ncdchk(nf90_inquire(fid, nDim,nVar,nAtt,uDid,fNum) ,msg)
+  !determine number of frames in the file (size of uDid)
+  uD_extant = 1
+  if(uDid /= 0)then
+    call ncdchk(nf90_inquire_dimension(fid, uDid, dname, uD_extant ))
+  endif
+  nframes = uD_extant+nframes
+  nfsnrec(n) = uD_extant
+  end do
+
+  !allocate space to hold times and read in 
+  !nframes = uD_extant
+   
+  allocate(ftimes(nframes)) ; ftimes = 0.0
+  allocate(fid_ft(nframes)) ; fid_ft = 0
+  allocate(rec_ft(nframes)) ; rec_ft = 0
+  allocate(fnr_ft(nframes)) ; fnr_ft = 0
+
+  msg = "error reading time variable from netcdf file"
+  uD_extant=0
+  do n=1,nfls
+  uD_extant=uD_extant+nfsnrec(n)
+  ffile_id=nfsfid(n)
+  call ncdchk( nf90_inq_varid(ffile_id,'time',varid),msg )
+  allocate(tmptime(nfsnrec(n))) ; tmptime = 0.0
+  call ncdchk(nf90_get_var(ffile_id, varid,tmptime ),msg)
+  ftimes(uD_extant-nfsnrec(n)+1 : uD_extant  )=tmptime(1:nfsnrec(n))
+  deallocate(tmptime)
+  !read units on time to see if conversion from days to seconds is necessary
+  if ( n == nfls ) then
+  if ( nf90_get_att(ffile_id, varid, 'units', tunits) == nf90_noerr)then
+    if(index(tunits,'day') /= 0) ftimes = ftimes*day_2_sec
+    write(*,*)'%%%%%% converting netcdf time units to seconds!!!!'
+  endif
+  endif
+  fid_ft(uD_extant-nfsnrec(n)+1 : uD_extant  ) = ffile_id
+  rec_ft(uD_extant-nfsnrec(n)+1 : uD_extant  ) = (/(i,i=1,nfsnrec(n))/)
+  fnr_ft(uD_extant-nfsnrec(n)+1 : uD_extant  ) = n
+  enddo
+   
+
+  !set begin/end/deltaT from forcing
+  !make sure time is sequential
+  forcing_beg_time = ftimes(1)
+  forcing_end_time = ftimes(nframes)
+
+  if(nframes > 1)then
+    do i=2,nframes
+      if(ftimes(i)-ftimes(i-1) <= 0.0)then
+        write(*,*)'netcdf time is not monotonically increasing'
+      endif
+    end do
+  endif
+
+  !set fbeg/fend to return val
+  fbeg = forcing_beg_time
+  fend = forcing_end_time
+    
+  call drawline('-')
+  write(*,*)'Opened up model forcing file: ',ffiles_in
+  write(*,*)'number of frames in file: ',nfsnrec
+  write(*,*)'forcing begins at:',gettime(int(fbeg)),fbeg
+  write(*,*)'forcing ends   at:',gettime(int(fend)),fend
+  call drawline('-')
+
+end subroutine open_forcing_file
 
 
 End Module forcing

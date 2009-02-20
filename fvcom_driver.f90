@@ -52,6 +52,7 @@ integer :: N_elems
 integer :: Max_Elems
 
 !mesh 
+integer :: iunit,ios
 logical :: mesh_setup = .false.
 real(sp), pointer :: xm(:)
 real(sp), pointer :: ym(:)
@@ -72,8 +73,37 @@ real(sp), pointer :: esiglev(:,:)
 !added by Xinyou
 real(sp), pointer :: a1u(:,:)
 real(sp), pointer :: a2u(:,:)
-
+character(len=10)  :: x_char,y_char,h_char,u_char,v_char, &
+  kh_char,ua_char,va_char,nv_char,aw0_char,awx_char,awy_char,a1u_char, &
+  a2u_char,nele_char,node_char,zeta_char,omega_char,         &
+  siglay_char,siglev_char,wu_char,wv_char
+  Namelist /NML_NCVAR/  &
+           x_char,   &
+           y_char,   &
+           h_char,   &
+          nv_char,   &
+        nele_char,   &
+        node_char,   &
+         aw0_char,   &
+         awx_char,   &
+         awy_char,   &
+         a1u_char,   &
+         a2u_char,   &
+      siglay_char,   &
+      siglev_char,   &
+          ua_char,   &
+          va_char,   &
+        zeta_char,   &
+           h_char,   &
+          wu_char,   &
+          wv_char,   &
+           u_char,   &
+           v_char,   &
+       omega_char,   &
+          kh_char 
+ 
 !
+
 logical :: grid_metrics
 
 interface interp
@@ -112,35 +142,53 @@ subroutine ocean_model_init(ng,g,lsize,varlist)
   fid = get_ncfid()
 
   !add required time dependent variables to the list
+  !--------------------------------------------------------
+  ! open and read  time dependent variables namelist:  nml_ncvar
+  !--------------------------------------------------------
+  open(unit=iunit,file=trim(runcontrol),form='formatted')
+  read(unit=iunit,nml=nml_ncvar,iostat=ios)
+  if(ios /= 0)then
+    write(*,*)'fvcom:fatal error: could not read fiscm namelist from',trim(runcontrol)
+    stop
+  endif
+
   do n=1,ng
     if(g(n)%space_dim == 2)then
-      lsize = lsize + 1 ; varlist(lsize) = 'ua'
-      lsize = lsize + 1 ; varlist(lsize) = 'va'
-      lsize = lsize + 1 ; varlist(lsize) = 'zeta'
-      lsize = lsize + 1 ; varlist(lsize) = 'h'
+      lsize = lsize + 1 ; varlist(lsize) = ua_char
+      lsize = lsize + 1 ; varlist(lsize) = va_char
+      lsize = lsize + 1 ; varlist(lsize) = zeta_char
+      lsize = lsize + 1 ; varlist(lsize) = h_char
+      if (wind_type == 1)then
+      lsize = lsize + 1 ; varlist(lsize) = wu_char
+      lsize = lsize + 1 ; varlist(lsize) = wv_char
+      endif
     elseif(g(n)%space_dim ==3)then
-      lsize = lsize + 1 ; varlist(lsize) = 'u'
-      lsize = lsize + 1 ; varlist(lsize) = 'v'
-      lsize = lsize + 1 ; varlist(lsize) = 'zeta'
-      lsize = lsize + 1 ; varlist(lsize) = 'omega'
-      lsize = lsize + 1 ; varlist(lsize) = 'h'
-      lsize = lsize + 1 ; varlist(lsize) = 'kh'
+      lsize = lsize + 1 ; varlist(lsize) = u_char
+      lsize = lsize + 1 ; varlist(lsize) = v_char
+      lsize = lsize + 1 ; varlist(lsize) = zeta_char
+      lsize = lsize + 1 ; varlist(lsize) = omega_char
+      lsize = lsize + 1 ; varlist(lsize) = h_char
+      if (wind_type == 1)then
+      lsize = lsize + 1 ; varlist(lsize) = wu_char
+      lsize = lsize + 1 ; varlist(lsize) = wv_char
+      endif
+      lsize = lsize + 1 ; varlist(lsize) = kh_char
     endif
   end do
 
   !determine number of elements
   msg = "dimension 'nele' not in the netcdf dataset"
-  call ncdchk(nf90_inq_dimid(fid, 'nele', dimid ),msg)
+  call ncdchk(nf90_inq_dimid(fid, nele_char, dimid ),msg)
   call ncdchk(nf90_inquire_dimension(fid, dimid, dname, N_elems ))
 
   !determine number of nodes 
   msg = "dimension 'node' not in the netcdf dataset"
-  call ncdchk(nf90_inq_dimid(fid, 'node', dimid ),msg)
+  call ncdchk(nf90_inq_dimid(fid, node_char, dimid ),msg)
   call ncdchk(nf90_inquire_dimension(fid, dimid, dname, N_verts ))
 
   !determine number of layers
   msg = "dimension 'siglay' not in the netcdf dataset"
-  call ncdchk(nf90_inq_dimid(fid, 'siglay', dimid ),msg)
+  call ncdchk(nf90_inq_dimid(fid, siglay_char, dimid ),msg)
   call ncdchk(nf90_inquire_dimension(fid, dimid, dname, N_lay ))
   N_lev = N_lay + 1
 
@@ -170,34 +218,39 @@ subroutine ocean_model_init(ng,g,lsize,varlist)
   ALLOCATE(ISONB(0:N_verts))          ;ISONB    = 0  !!NODE MARKER = 0,1,2
   ALLOCATE(ISBCE(0:N_elems))          ;ISBCE    = 0
 
+
+
+
   !read in mesh
+ 
+
   msg = "error reading x coordinate"
-  call ncdchk( nf90_inq_varid(fid,'x',varid),msg )
+  call ncdchk( nf90_inq_varid(fid,x_char,varid),msg )
   call ncdchk(nf90_get_var(fid, varid, xm),msg)
   msg = "error reading y coordinate"
-  call ncdchk( nf90_inq_varid(fid,'y',varid),msg )
+  call ncdchk( nf90_inq_varid(fid,y_char,varid),msg )
   call ncdchk(nf90_get_var(fid, varid, ym),msg)
   msg = "error reading h coordinate"
-  call ncdchk( nf90_inq_varid(fid,'h',varid),msg )
+  call ncdchk( nf90_inq_varid(fid,h_char,varid),msg )
   call ncdchk(nf90_get_var(fid, varid, hm),msg)
   msg = "error reading nv coordinate"
-  call ncdchk( nf90_inq_varid(fid,'nv',varid),msg )
+  call ncdchk( nf90_inq_varid(fid,nv_char,varid),msg )
   call ncdchk(nf90_get_var(fid, varid, tri),msg)
   msg = "error reading aw0"
   !read aw0 if they exist, otherwise use 1st order interpolation
-  if(ncdscan( nf90_inq_varid(fid,'aw0',varid),msg ) )then
+  if(ncdscan( nf90_inq_varid(fid,aw0_char,varid),msg ) )then
     call ncdchk(nf90_get_var(fid, varid, aw0),msg)
     msg = "error reading awx"
-    call ncdchk( nf90_inq_varid(fid,'awx',varid),msg )
+    call ncdchk( nf90_inq_varid(fid,awx_char,varid),msg )
     call ncdchk(nf90_get_var(fid, varid, awx),msg)
     msg = "error reading awy"
-    call ncdchk( nf90_inq_varid(fid,'awy',varid),msg )
+    call ncdchk( nf90_inq_varid(fid,awy_char,varid),msg )
     call ncdchk(nf90_get_var(fid, varid, awy),msg)
     msg = "error reading a1u"
-    call ncdchk( nf90_inq_varid(fid,'a1u',varid),msg )
+    call ncdchk( nf90_inq_varid(fid,a1u_char,varid),msg )
     call ncdchk(nf90_get_var(fid, varid, a1u),msg)
     msg = "error reading a2u"
-    call ncdchk( nf90_inq_varid(fid,'a2u',varid),msg )
+    call ncdchk( nf90_inq_varid(fid,a2u_char,varid),msg )
     call ncdchk(nf90_get_var(fid, varid, a2u),msg)
 
   else 
@@ -207,10 +260,10 @@ subroutine ocean_model_init(ng,g,lsize,varlist)
     write(*,*)'In the future, select [grid metrics] in your NetCDF namelist'
   endif
   msg = "error reading siglay"
-  call ncdchk( nf90_inq_varid(fid,'siglay',varid),msg )
+  call ncdchk( nf90_inq_varid(fid,siglay_char,varid),msg )
   call ncdchk(nf90_get_var(fid, varid, siglay),msg)
   msg = "error reading siglev"
-  call ncdchk( nf90_inq_varid(fid,'siglev',varid),msg )
+  call ncdchk( nf90_inq_varid(fid,siglev_char,varid),msg )
   call ncdchk(nf90_get_var(fid, varid, siglev),msg)
 
   !read secondary connectivity (nbve/ntve) 
@@ -453,8 +506,8 @@ subroutine rw_vdiff(g, dT, nstep)
   !set constants
   fac = (2./rvar)*deltaT  ![ 2*r^-1*deltaT], r = variance of uniform rw, set in gparms
 
-  call interp(np,x,y,cell,istatus,'h',h,3)
-  call interp(np,x,y,cell,istatus,'zeta',zeta,3)
+  call interp(np,x,y,cell,istatus,h_char,h,3)
+  call interp(np,x,y,cell,istatus,zeta_char,zeta,3)
 
   ! ==> loop over substeps
   do n=1,nstep
@@ -468,15 +521,15 @@ subroutine rw_vdiff(g, dT, nstep)
     where(s+delta_s > 0)ds = -delta_s
 
     !evaluate kh at both locations
-    call interp(np,x,y,s,cell,istatus,'kh',kh,3)
-    call interp(np,x,y,s+ds,cell,istatus,'kh',kh2,3)
+    call interp(np,x,y,s,cell,istatus,kh_char,kh,3)
+    call interp(np,x,y,s+ds,cell,istatus,kh_char,kh2,3)
 
     !form the derivative d(kh)/d(s)
     dkh_ds = (kh2-kh)/ds
 
     !function evaluation at [z + 0.5*dkh/dz*deltat] - Visser
     s_shift = s + dkh_ds*deltaT/((h+zeta)**2)
-    call interp(np,x,y,s_shift,cell,istatus,'kh',kh,3)
+    call interp(np,x,y,s_shift,cell,istatus,kh_char,kh,3)
 
     ! => main loop over particles
     do p=1,np
@@ -588,8 +641,8 @@ subroutine sz_trans(np,g)
   call get_state('status',g,istatus)
   call get_state('cell',g,cell)
 
-  call interp(np,x,y,cell,istatus,'zeta',zeta,3)
-  call interp(np,x,y,cell,istatus,'h',h,3)
+  call interp(np,x,y,cell,istatus,zeta_char,zeta,3)
+  call interp(np,x,y,cell,istatus,h_char,h,3)
   if(sz_cor == 1)then
      z  = -z + zeta 
      s  = (z - zeta)/(h + zeta)
@@ -650,10 +703,10 @@ subroutine advect2D(g,deltaT,np)
      pdy(:) = y(:)  + a_rk(ns)*deltaT*chiy(:,ns-1)
      !!Calculate Velocity Field for Stage N Using C_RK Coefficients
      !interpolate velocity field to particle position
-  call interp(np,pdx,pdy,cell,istatus,'ua',u1,3)
-  call interp(np,pdx,pdy,cell,istatus,'va',v1,3)
-  call interp(np,pdx,pdy,cell,istatus,'ua',u2,4)
-  call interp(np,pdx,pdy,cell,istatus,'va',v2,4)
+  call interp(np,pdx,pdy,cell,istatus,ua_char,u1,3)
+  call interp(np,pdx,pdy,cell,istatus,va_char,v1,3)
+  call interp(np,pdx,pdy,cell,istatus,ua_char,u2,4)
+  call interp(np,pdx,pdy,cell,istatus,va_char,v2,4)
    u  = (1.0_sp-c_rk(ns))*u1 + c_rk(ns)*u2
    v  = (1.0_sp-c_rk(ns))*v1 + c_rk(ns)*v2
    chix(:,ns)  = u(:)
@@ -699,6 +752,7 @@ subroutine advect3D(g,deltaT,np,time)
   
   real(sp), dimension(np) :: u,u1,u2,v,v1,v2,w,w1,w2,wm
   real(sp), dimension(np) :: zeta,zeta1,zeta2,pdx,pdy,pdz
+  real(sp), dimension(np) :: wu,wu1,wu2,wv,wv1,wv2
   real(sp), dimension(np) :: pdxt,pdyt,pdzt
 
   real(sp), dimension(np,0:mstage) :: chix,chiy,chiz  
@@ -732,7 +786,28 @@ subroutine advect3D(g,deltaT,np,time)
      pdx(:) = x(:)  + a_rk(ns)*deltaT*chix(:,ns-1)
      pdy(:) = y(:)  + a_rk(ns)*deltaT*chiy(:,ns-1)
      pdz(:) = s(:)  + a_rk(ns)*deltaT*chiz(:,ns-1)
+!!!!!
+     if (spherical == 1)then 
+     pdx(:) = x(:)  + a_rk(ns)*deltaT*chix(:,ns-1)/(tpi*COS(pdy(:)) + 1.0E-6)
+     pdy(:) = y(:)  + a_rk(ns)*deltaT*chiy(:,ns-1)/tpi
+     pdz(:) = s(:)  + a_rk(ns)*deltaT*chiz(:,ns-1)
+          
+     where( pdx < 0.0_SP)
+     pdx = pdx + 360.0_SP
+     end where
+     where( pdx > 360.0_SP)
+     pdx = pdx - 360.0_SP
+     end where
 
+     where( pdy > 90.0_SP)
+     pdy = 180.0_SP - pdy 
+     end where
+     where( pdy < -90.0_SP)
+     pdy =  - 180.0_SP - pdy
+     end where
+
+     endif
+!!!!!
      !!Adjust Sigma Position to Reflect Off Bottom (Mirroring)
      pdz = max(pdz,-(2.0+pdz))
 
@@ -742,18 +817,34 @@ subroutine advect3D(g,deltaT,np,time)
      !!Calculate Velocity Field for Stage N Using C_RK Coefficients
      !interpolate velocity field to particle position
 
-  call interp(np,pdx,pdy,pdz,cell,istatus,'u',u1,3)
-  call interp(np,pdx,pdy,pdz,cell,istatus,'v',v1,3)
-  call interp(np,pdx,pdy,pdz,cell,istatus,'omega',w1,3) !wts means omega
-  call interp(np,pdx,pdy,pdz,cell,istatus,'u',u2,4)
-  call interp(np,pdx,pdy,pdz,cell,istatus,'v',v2,4)
-  call interp(np,pdx,pdy,pdz,cell,istatus,'omega',w2,4)
-  call interp(np,pdx,pdy,cell,istatus,'h',h,3)
-  call interp(np,pdx,pdy,cell,istatus,'zeta',zeta1,3)
-  call interp(np,pdx,pdy,cell,istatus,'zeta',zeta2,4)
+  call interp(np,pdx,pdy,pdz,cell,istatus,u_char,u1,3)
+  call interp(np,pdx,pdy,pdz,cell,istatus,v_char,v1,3)
+  call interp(np,pdx,pdy,pdz,cell,istatus,omega_char,w1,3) !wts means omega
+  call interp(np,pdx,pdy,pdz,cell,istatus,u_char,u2,4)
+  call interp(np,pdx,pdy,pdz,cell,istatus,v_char,v2,4)
+  call interp(np,pdx,pdy,pdz,cell,istatus,omega_char,w2,4)
+  call interp(np,pdx,pdy,cell,istatus,h_char,h,3)
+  call interp(np,pdx,pdy,cell,istatus,zeta_char,zeta1,3)
+  call interp(np,pdx,pdy,cell,istatus,zeta_char,zeta2,4)
+!!!!!88!!!!!
+     if (wind_type == 1)then
+  call interp(np,pdx,pdy,cell,istatus,wu_char,wu1,3)
+  call interp(np,pdx,pdy,cell,istatus,wv_char,wv1,3)
+  call interp(np,pdx,pdy,cell,istatus,wu_char,wu2,4)
+  call interp(np,pdx,pdy,cell,istatus,wv_char,wv2,4)
+   wu  = (1.0_sp-c_rk(ns))*wu1 + c_rk(ns)*wu2
+   wv  = (1.0_sp-c_rk(ns))*wv1 + c_rk(ns)*wv2
 
+!!!!!!!!!!
+   u  = (1.0_sp-c_rk(ns))*u1 + c_rk(ns)*u2  
+   v  = (1.0_sp-c_rk(ns))*v1 + c_rk(ns)*v2  
+   u  = u + wu*0.02
+   v  = v + wv*0.02
+     elseif (wind_type == 0) then
    u  = (1.0_sp-c_rk(ns))*u1 + c_rk(ns)*u2
    v  = (1.0_sp-c_rk(ns))*v1 + c_rk(ns)*v2
+
+     endif
    w  = (1.0_sp-c_rk(ns))*w1 + c_rk(ns)*w2
    zeta  = (1.0_sp-c_rk(ns))*zeta1  + c_rk(ns)*zeta2
 
@@ -762,10 +853,12 @@ subroutine advect3D(g,deltaT,np,time)
       do ni = 1, np
        if(6.0 <= diel .and. diel <18.0)then
         pdzt(ni) = (1 + pdz(ni))*(h(ni)+zeta(ni))  
-        w(ni) = w(ni) + 0.0075*tanh((pdzt(ni) -  1)*3.14159)
+!        w(ni) = w(ni) - 0.0075*tanh((pdzt(ni) -  2)*3.14159)
+!         w(ni) = w(ni) - 0.0075*tanh((pdzt(ni) -  10))
+         w(ni) = w(ni) - 0.0075*tanh((pdzt(ni) -  dvmh_dn)) !from bottom
        else
         pdzt(ni) = -pdz(ni)*(h(ni)+zeta(ni))
-        w(ni) = w(ni) + 0.0075*tanh((pdzt(ni) - 15)*3.14159)
+        w(ni) = w(ni) + 0.0075*tanh((pdzt(ni) - dvmh_up))   !from surface
        endif
        enddo
    endif
@@ -800,8 +893,8 @@ end do
   s = min(s,0.0_sp)                      !Don t Pierce Free Surface
 
   !--Evaluate Bathymetry and Free Surface Height at Updated Particle Position----!
-  call interp(np,x,y,cell,istatus,'h',h,4)
-  call interp(np,x,y,cell,istatus,'zeta',zeta,4)
+  call interp(np,x,y,cell,istatus,h_char,h,4)
+  call interp(np,x,y,cell,istatus,zeta_char,zeta,4)
   !--Sigma adjustment if fixed depth tracking------------------------------------!
   if(fix_dep == 1)then
       s = (-zpini)/(h+zeta)  !  THIS IS REALLY PDZN = ((-LAG%ZPIN+EP) - EP)/(HP+EP)

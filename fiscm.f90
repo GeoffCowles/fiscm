@@ -13,7 +13,7 @@ Module fiscm_data
   use forcing
   implicit none
   type(igroup), allocatable :: igroups(:)
-  character(len=fstr) :: runcontrol 
+  !character(len=fstr) :: runcontrol 
   real(sp) :: beg_time,end_time
   real(sp) :: beg_time_days,end_time_days
   real(sp) :: fbeg,fend
@@ -22,16 +22,24 @@ Module fiscm_data
   integer  :: Ireport 
   integer  :: sim_direction
   integer  :: ngroups
-  character(len=fstr) :: forcing_file
-
+  integer  :: nfiles_in
+  character(len=fstr) :: forcing_file(max_nf)
+  
   Namelist /NML_FISCM/ &
       beg_time_days,   & 
       end_time_days,   &
       deltaT,          &
       ireport,         &
       Ngroups,         &
-      forcing_file
-  
+      Nfiles_in,       &     
+      forcing_file,    &
+      spherical,       &
+      sz_cor,          &
+      fix_dep,         &
+      dvm_bio,         &
+     wind_type,        &
+     dvmh_up,          &
+     dvmh_dn  
 End Module fiscm_data
 
 Program fiscm
@@ -243,7 +251,6 @@ Subroutine setup
     write(*,*)'fatal error: could not read fiscm namelist from',trim(runcontrol)
     stop
   endif
-
   !sanity on number of gruops 
   if(ngroups < 1)then
     write(*,*)'Fatal error: number of groups < 1' ; stop 
@@ -262,10 +269,13 @@ Subroutine setup
   endif
 
   !check for existence and open forcing file (if needed) 
-  if(trim(forcing_file) /= 'NONE' .and. trim(forcing_file) /= 'none')then
+  !if(trim(forcing_file) /= 'NONE' .and. trim(forcing_file) /= 'noe')then
+   if(nfiles_in > 0) then
     fbeg = -1.0
     fend = -1.0
-    call open_forcing_file(trim(forcing_file),fbeg,fend) 
+!    call open_forcing_file(trim(forcing_file),fbeg,fend) 
+     call open_forcing_file(forcing_file,nfiles_in,fbeg,fend)
+
   endif
 
   !report
