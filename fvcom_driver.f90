@@ -54,15 +54,16 @@ integer :: Max_Elems
 !mesh 
 integer :: iunit,ios
 logical :: mesh_setup = .false.
-real(sp), pointer :: xm(:)
-real(sp), pointer :: ym(:)
-real(sp), pointer :: xc(:)
-real(sp), pointer :: yc(:)
+real(sp), pointer :: xm(:),xm0(:)
+real(sp), pointer :: ym(:),ym0(:)
+real(sp), pointer :: xc(:),xc0(:)
+real(sp), pointer :: yc(:),yc0(:)
 real(sp), pointer :: hm(:)
 real(sp), pointer :: aw0(:,:)
 real(sp), pointer :: awx(:,:)
 real(sp), pointer :: awy(:,:)
 integer, pointer  :: tri(:,:)
+
 integer, pointer  :: ntve(:)
 integer, pointer  :: nbve(:,:)
 real(sp), pointer :: siglay(:,:)
@@ -195,6 +196,11 @@ subroutine ocean_model_init(ng,g,lsize,varlist)
   !allocate dataspace
   allocate(xm(N_verts))
   allocate(ym(N_verts))
+  allocate(xm0(N_verts))
+  allocate(ym0(N_verts))
+
+  allocate(xc0(N_elems))
+  allocate(yc0(N_elems))
   allocate(xc(N_elems))
   allocate(yc(N_elems))
   allocate(hm(N_verts))
@@ -230,6 +236,7 @@ subroutine ocean_model_init(ng,g,lsize,varlist)
   msg = "error reading y coordinate"
   call ncdchk( nf90_inq_varid(fid,y_char,varid),msg )
   call ncdchk(nf90_get_var(fid, varid, ym),msg)
+
   msg = "error reading h coordinate"
   call ncdchk( nf90_inq_varid(fid,h_char,varid),msg )
   call ncdchk(nf90_get_var(fid, varid, hm),msg)
@@ -291,11 +298,30 @@ subroutine ocean_model_init(ng,g,lsize,varlist)
 
 
   !calculate cell center coordinates
+     if(spherical == 1)then
+       do i=1,N_verts
+       
+       xm0(i) = xm(i)
+       ym0(i) = ym(i)
+       if(xm0(i) >= 0.0_sp .and. xm0(i) <=180.0_sp)then
+          xm0(i) = xm0(i) + 180.0_sp
+       elseif( xm0(i) > 180.0_sp .and. xm0(i) <=360.0_sp)  then
+         xm0(i) = xm0(i) - 180.0_sp
+       endif
+       enddo
+     endif
+
+
   do i=1,N_elems
     subset = tri(i,1:3)
     xc(i)  = a3rd*(sum(xm(subset)))
     yc(i)  = a3rd*(sum(ym(subset)))
+    if(spherical == 1)then
+    xc0(i)  = a3rd*(sum(xm0(subset)))
+    yc0(i)  = a3rd*(sum(ym0(subset)))
+    endif
   end do
+
 
   !calculate cell-center siglay/siglev
   do i=1,N_elems
@@ -427,8 +453,30 @@ subroutine rw_hdiff_constant(g, dT)
     if(istatus(i) < 1)cycle
 !    x(i) = x(i) + normal()*tscale
 !    y(i) = y(i) + normal()*tscale
-    x(i) = x(i) + unitrand()*tscale
-    y(i) = y(i) + unitrand()*tscale
+     if(spherical == 0 )then
+     x(i) = x(i) + unitrand()*tscale
+     y(i) = y(i) + unitrand()*tscale
+     elseif (spherical == 1)then
+     x(:) = x(:)  + unitrand()*tscale/(tpi*COS(y(:)) + 1.0E-6)
+     y(:) = y(:)  + unitrand()*tscale/tpi
+    
+
+     where( x < 0.0_SP)
+     x = x + 360.0_SP
+     end where
+     where( x > 360.0_SP)
+     x = x - 360.0_SP
+     end where
+
+     where( y > 90.0_SP)
+     y = 180.0_SP - y
+     end where
+     where( y < -90.0_SP)
+     y =  - 180.0_SP - y
+     end where
+
+     endif
+
   end do
 
   !nullify pointers
@@ -494,7 +542,6 @@ subroutine rw_vdiff(g, dT, nstep)
   call get_state('y',g,y)
   call get_state('s',g,s)
   call get_state('h',g,h)
-
   !allocate local data
   allocate(s_shift(np)); s_shift = zero 
   allocate(zeta(np)); zeta = zero 
@@ -772,6 +819,7 @@ subroutine advect3D(g,deltaT,np,time)
   call get_state('cell',g,cell)
   call get_state('status',g,istatus)
 
+  !disassociate pointers
   !--Initialize Stage Functional Evaluations
   chix = 0.0_sp
   chiy = 0.0_sp
@@ -783,11 +831,13 @@ subroutine advect3D(g,deltaT,np,time)
   do ns=1,mstage
 
      !!Particle Position at Stage N (x,y,sigma)
+     
+     if (spherical == 0)then 
      pdx(:) = x(:)  + a_rk(ns)*deltaT*chix(:,ns-1)
      pdy(:) = y(:)  + a_rk(ns)*deltaT*chiy(:,ns-1)
      pdz(:) = s(:)  + a_rk(ns)*deltaT*chiz(:,ns-1)
 !!!!!
-     if (spherical == 1)then 
+     elseif (spherical == 1)then 
      pdx(:) = x(:)  + a_rk(ns)*deltaT*chix(:,ns-1)/(tpi*COS(pdy(:)) + 1.0E-6)
      pdy(:) = y(:)  + a_rk(ns)*deltaT*chiy(:,ns-1)/tpi
      pdz(:) = s(:)  + a_rk(ns)*deltaT*chiz(:,ns-1)
@@ -879,9 +929,32 @@ end do
   pdyt(:)  = y(:)
   pdzt(:)  = s(:)
   do ns=1,mstage
+     if (spherical == 0)then 
      pdxt(:) = pdxt(:) + deltaT*chix(:,ns)*b_rk(ns)*FLOAT(istatus(:))
      pdyt(:) = pdyt(:) + deltaT*chiy(:,ns)*b_rk(ns)*FLOAT(istatus(:))
      pdzt(:) = pdzt(:) + deltaT*chiz(:,ns)*b_rk(ns)*FLOAT(istatus(:))
+!!!!!
+     elseif (spherical == 1)then 
+     pdxt(:) = pdxt(:)  + a_rk(ns)*deltaT*chix(:,ns-1)/(tpi*COS(pdy(:)) + 1.0E-6)
+     pdyt(:) = pdyt(:)  + a_rk(ns)*deltaT*chiy(:,ns-1)/tpi
+     pdzt(:) = pdzt(:)  + a_rk(ns)*deltaT*chiz(:,ns-1)
+          
+     where( pdxt < 0.0_SP)
+     pdxt = pdxt + 360.0_SP
+     end where
+     where( pdxt > 360.0_SP)
+     pdxt = pdxt - 360.0_SP
+     end where
+
+     where( pdyt > 90.0_SP)
+     pdyt = 180.0_SP - pdyt 
+     end where
+     where( pdyt < -90.0_SP)
+     pdyt =  - 180.0_SP - pdyt
+     end where
+
+     endif
+!!!!!
   end do
  call find_element(np,x,y,cell,istatus)
   !--Update Only Particle Still in Water
@@ -895,6 +968,7 @@ end do
   !--Evaluate Bathymetry and Free Surface Height at Updated Particle Position----!
   call interp(np,x,y,cell,istatus,h_char,h,4)
   call interp(np,x,y,cell,istatus,zeta_char,zeta,4)
+
   !--Sigma adjustment if fixed depth tracking------------------------------------!
   if(fix_dep == 1)then
       s = (-zpini)/(h+zeta)  !  THIS IS REALLY PDZN = ((-LAG%ZPIN+EP) - EP)/(HP+EP)
@@ -902,7 +976,6 @@ end do
       s = max(s,-1.0_SP)     ! Depth can change though if particle goes into shallower areas
 
   endif
-
 
 
   !--Calculate Particle Location in Cartesian Vertical Coordinate----------------!
@@ -940,7 +1013,7 @@ subroutine interp_float2D(np,x,y,cell,istatus,vname,v,iframe)
   !added by xinyou
   integer  :: e1,e2,e3,n1,n2,n3
   real(sp) :: xoc,yoc,dvdx,dvdy
-  real(sp) :: e0,ex,ey
+  real(sp) :: e0,ex,ey,tmpx
   !determine dimension of forcing variable
 
   !point to forcing variable
@@ -958,9 +1031,24 @@ subroutine interp_float2D(np,x,y,cell,istatus,vname,v,iframe)
       e1  = nbe(icell,1)
       e2  = nbe(icell,2)
       e3  = nbe(icell,3)
+        if (spherical == 0)then
       xoc = x(i) - xc(icell)
       yoc = y(i) - yc(icell)
-
+        elseif(spherical == 1)then
+            
+          if(x(i) >=90.0 .and. x(i) <=270.0)then
+          xoc = x(i) - xc(icell)
+          yoc = y(i) - yc(icell)
+          else
+              if(x(i) >= 0.0_sp .and. x(i) <=180.0_sp)then
+                tmpx = x(i) + 180.0_sp
+              elseif( x(i) > 180.0_sp .and. x(i) <=360.0_sp)  then
+                tmpx = x(i) - 180.0_sp
+              endif
+          xoc = tmpx - xc0(icell)
+          yoc = y(i) - yc0(icell)
+          endif
+        endif
         
      dvdx = a1u(icell,1)*field(icell)+a1u(icell,2)*field(e1)     &
           + a1u(icell,3)*field(e2)   +a1u(icell,4)*field(e3)
@@ -978,8 +1066,26 @@ subroutine interp_float2D(np,x,y,cell,istatus,vname,v,iframe)
      n1  = tri(icell,1)
      n2  = tri(icell,2)
      n3  = tri(icell,3)
-     xoc = x(i) - xc(icell)
-     yoc = y(i) - yc(icell)
+     
+        if (spherical == 0)then
+      xoc = x(i) - xc(icell)
+      yoc = y(i) - yc(icell)
+        elseif(spherical == 1)then
+
+          if(x(i) >=90.0 .and. x(i) <=270.0)then
+          xoc = x(i) - xc(icell)
+          yoc = y(i) - yc(icell)
+          else
+              if(x(i) >= 0.0_sp .and. x(i) <=180.0_sp)then
+                tmpx = x(i) + 180.0_sp
+              elseif( x(i) > 180.0_sp .and. x(i) <=360.0_sp)  then
+                tmpx = x(i) - 180.0_sp
+              endif
+          xoc = tmpx - xc0(icell)
+          yoc = y(i) - yc0(icell)
+          endif
+        endif
+
      !----Linear Interpolation of Free Surface Height---------------------------------!
     
      e0 = aw0(icell,1)*field(n1)+aw0(icell,2)*field(n2)+aw0(icell,3)*field(n3)
@@ -1016,7 +1122,7 @@ subroutine interp_float3D(np,x,y,s,cell,istatus,vname,v,iframe)
 
   real(sp), pointer :: field(:,:)  !pointer to FVCOM field 
   integer  :: i,d1,d2,icell,k1,k2,ktype
-  real(sp) :: f1,f2,v1,v2
+  real(sp) :: f1,f2,v1,v2,tmpx
   integer  :: vts(3)
   !added by xinyou
   integer  :: e1,e2,e3,k,n1,n2,n3
@@ -1060,8 +1166,26 @@ subroutine interp_float3D(np,x,y,s,cell,istatus,vname,v,iframe)
       e1  = nbe(icell,1)
       e2  = nbe(icell,2)
       e3  = nbe(icell,3)
+        if (spherical == 0)then
       xoc = x(i) - xc(icell)
       yoc = y(i) - yc(icell)
+        elseif(spherical == 1)then
+
+          if(x(i) >=90.0 .and. x(i) <=270.0)then
+          xoc = x(i) - xc(icell)
+          yoc = y(i) - yc(icell)
+          else
+              if(x(i) >= 0.0_sp .and. x(i) <=180.0_sp)then
+                tmpx = x(i) + 180.0_sp
+              elseif( x(i) > 180.0_sp .and. x(i) <=360.0_sp)  then
+                tmpx = x(i) - 180.0_sp
+              endif
+          xoc = tmpx - xc0(icell)
+          yoc = y(i) - yc0(icell)
+          endif
+        endif
+
+
         k = k1
      dvdx = a1u(icell,1)*field(icell,k)+a1u(icell,2)*field(e1,k)     &
           + a1u(icell,3)*field(e2,k)   +a1u(icell,4)*field(e3,k)
@@ -1100,8 +1224,25 @@ subroutine interp_float3D(np,x,y,s,cell,istatus,vname,v,iframe)
      n1  = tri(icell,1)
      n2  = tri(icell,2)
      n3  = tri(icell,3)
-     xoc = x(i) - xc(icell)
-     yoc = y(i) - yc(icell)
+        if (spherical == 0)then
+      xoc = x(i) - xc(icell)
+      yoc = y(i) - yc(icell)
+        elseif(spherical == 1)then
+
+          if(x(i) >=90.0 .and. x(i) <=270.0)then
+          xoc = x(i) - xc(icell)
+          yoc = y(i) - yc(icell)
+          else
+              if(x(i) >= 0.0_sp .and. x(i) <=180.0_sp)then
+                tmpx = x(i) + 180.0_sp
+              elseif( x(i) > 180.0_sp .and. x(i) <=360.0_sp)  then
+                tmpx = x(i) - 180.0_sp
+              endif
+          xoc = tmpx - xc0(icell)
+          yoc = y(i) - yc0(icell)
+          endif
+        endif
+
      !----Linear Interpolation of Free Surface Height---------------------------------!
       k = k1
      e0 = aw0(icell,1)*field(n1,k)+aw0(icell,2)*field(n2,k)+aw0(icell,3)*field(n3,k)

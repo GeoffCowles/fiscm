@@ -134,7 +134,6 @@ subroutine interp_forcing(ng,g,iframe)
     if(g(n)%space_dim == 3)then
       call get_state('s',g(n),s)
     endif
-    
     !loop over external variables, interpolate onto points
     do v=1,g(n)%next
   
@@ -173,8 +172,11 @@ subroutine interp_forcing(ng,g,iframe)
     end do !loop over external vars
 
   end do !group loop
-  
-
+nullify(x)
+nullify(y)
+nullify(istatus)
+nullify(cell)  
+nullify(s)
 
 end subroutine interp_forcing
 
@@ -203,11 +205,13 @@ subroutine update_element(ng,g)
     call get_state('y',g(n),y)
     call get_state('cell',g(n),cell)
     call get_state('status',g(n),istatus)
-  
     !update element containing cell 
     call find_element(np,x(1:np),y(1:np),cell(1:np),istatus(1:np))
   end do
-
+nullify(x)
+nullify(y)
+nullify(cell)
+nullify(istatus)
 
 end subroutine update_element
 

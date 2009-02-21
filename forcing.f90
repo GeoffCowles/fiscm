@@ -786,6 +786,7 @@ write(*,*)ffile_in
   deallocate(tmptime)
   !read units on time to see if conversion from days to seconds is necessary
   if ( n == nfls ) then
+     ftimes = ftimes - 43*365.0
   if ( nf90_get_att(ffile_id, varid, 'units', tunits) == nf90_noerr)then
     if(index(tunits,'day') /= 0) ftimes = ftimes*day_2_sec
     write(*,*)'%%%%%% converting netcdf time units to seconds!!!!'
