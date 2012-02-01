@@ -1,0 +1,124 @@
+&NML_FISCM
+ beg_time_days   = 54832.,
+ end_time_days   = 54833.,
+ deltaT          = 240,
+ ireport         = 1,
+ ngroups         = 1,
+ nfiles_in       = 1,
+ forcing_file    = 'testing/solidbody/solidbody.nc', 
+ spherical       = 0,
+ sz_cor          = 0,
+ fix_dep         = 0,
+ dvm_bio         = 0,
+ wind_type       = 0,
+ dvmh_up         = 15.0,
+ dvmh_dn         = 1.0
+/
+
+&NML_NCVAR
+          x_char  ='x',
+          y_char  ='y',
+          h_char  ='h',
+         nv_char  ='nv',
+       nele_char  ='nele',
+       node_char  ='node',
+        nbe_char  ='nbe',
+        aw0_char  ='aw0',
+        awx_char  ='awx',
+        awy_char  ='awy',
+        a1u_char  ='a1u',
+        a2u_char  ='a2u',
+     siglay_char  ='siglay',
+     siglev_char  ='siglev',
+         ua_char  ='ua',
+         va_char  ='va',
+       zeta_char  ='zeta',
+          h_char  ='h',
+         wu_char  ='windu',
+         wv_char  ='windv',
+          u_char  ='u',
+          v_char  ='v',
+      omega_char  ='ww',
+         kh_char  ='km'
+/
+
+
+&NML_GROUP
+ init_pos_file    = 'testing/solidbody/solidbody.dat', 
+ space_dim        = 3,
+ group_name       = 'Test', 
+ hdiff_type       = 0,
+ hdiff_const_val  = 0.1,
+ vdiff_type       = 0,
+ vdiff_const_val  = 0.0,
+ vdiff_substeps   = 500
+ intvl_bio        = 5,
+ biology          = T,
+ intvl_out        = 1,
+ start_out        = 0.0,
+ nstate           = 4,
+ statefile        = 'solidbody.nml',
+ paramfile        = 'solidbody.nml'
+/
+
+ &NML_STATEVAR
+ state_varname          = 'stage',
+ state_longname         = 'stage',
+ state_units            = '-',
+ state_netcdf_out       = 1,
+ state_vartype          = 1,
+ state_initval_int      = 1,
+ state_initval_flt      = 0.0,
+ state_from_ext_var     = 'NONE'
+/
+
+ &NML_STATEVAR
+ state_varname          = 'PASD',
+ state_longname         = 'Model Currency',
+ state_units            = '-',
+ state_netcdf_out       = 1,
+ state_vartype          = 2,
+ state_initval_int      = 1,
+ state_initval_flt      = 0.0,
+ state_from_ext_var     = 'NONE'
+/
+
+ &NML_STATEVAR
+ state_varname          = 'KH',
+ state_longname         = 'eddy diffusivity'
+ state_units            = 'm^2/s',
+ state_netcdf_out       = 1,
+ state_vartype          = 1,
+ state_initval_int      = 0,
+ state_initval_flt      = 0.0,
+ state_from_ext_var     = 'none'
+/
+
+ &NML_STATEVAR
+ state_varname          = 'N',
+ state_longname         = 'number of individuals',
+ state_units            = '-',
+ state_netcdf_out       = 1,
+ state_vartype          = 1,
+ state_initval_int      = 50000,
+ state_initval_flt      = 0.0,
+ state_from_ext_var     = 'NONE'
+/
+
+&NMLX_STATEVAR
+ state_varname          = 'T',
+ state_longname         = 'temperature',
+ state_units            = 'C',
+ state_netcdf_out       = 1,
+ state_vartype          = 2,
+ state_initval_int      = 1,
+ state_initval_flt      = 12.0,
+ state_from_ext_var     = 'temp'
+/
+
+ &NML_BS  
+ days_at_liberty        = 2.5,
+ some_other_var         = 0.4
+/
+
+
