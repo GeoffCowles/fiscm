@@ -47,6 +47,7 @@ contains
 !------------------------------------------------------------------
 subroutine init_bio(g,Nind_start)
   use output_routines
+  use utilities
   implicit none
   type(igroup), intent(inout) :: g
   integer,      intent(in)    :: Nind_start
@@ -88,9 +89,7 @@ subroutine init_bio(g,Nind_start)
 
   !set the spawning time
   call get_state('tspawn',g,tspawn)
-  tspawn(1) = (1.1/24)*day_2_sec
-  tspawn(2:g%Nind) = (2./24.)*day_2_sec
-  tspawn(:) = 1.1*day_2_sec  !0.0
+  tspawn = 0.0
   
   !set the spawning location
   !-----------------------------------
@@ -100,10 +99,11 @@ subroutine init_bio(g,Nind_start)
     call get_state('x',g,x)
     call get_state('y',g,y)
     !gom
-    do i=1,g%Nind
-      x(i) = 1.192e6 
-      y(i) = -76600 
-    end do
+    call random_square(g%Nind,8.751e5_sp,9.01e5_sp,-7.55e4_sp,-4.567e4_sp,x,y) 
+    !do i=1,g%Nind
+    !  x(i) = 270000 + float(i-1)*1000. 
+    !  y(i) = 154000. 
+    !end do
   
     !fake_forcing
     !do i=1,g%Nind
@@ -117,9 +117,10 @@ subroutine init_bio(g,Nind_start)
   !-----------------------------------
   if(g%space_dim > 2)then
     call get_state('s',g,s)
-    do i=1,g%Nind
-      s(i) = -float(i-1)/float(g%Nind-1)
-    end do
+    s = 0;
+    !do i=1,g%Nind
+    !  s(i) = -float(i-1)/float(g%Nind-1)
+    !end do
   endif
 
 !  skagit

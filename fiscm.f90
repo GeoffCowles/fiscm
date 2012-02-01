@@ -16,6 +16,7 @@ Module fiscm_data
   !character(len=fstr) :: runcontrol 
   real(sp) :: beg_time,end_time
   real(sp) :: beg_time_days,end_time_days
+  real(sp) :: fiscm_time,fiscm_time_days,tshift
   real(sp) :: fbeg,fend
   real(sp) :: tsmin,tsmax
   real(sp) :: deltaT
@@ -76,7 +77,6 @@ Program fiscm
   !----------------------------------------------------------
   do n=1,ngroups
     if(igroups(n)%biology)call init_bio(igroups(n),igroups(n)%Tnind)
-
   end do
 
   !----------------------------------------------------------
@@ -118,12 +118,9 @@ Program fiscm
   ! ensure times (spawning, simulation, forcing)
   ! are compatible
   !----------------------------------------------------------
-  !tsmin=121.0*24.*3600.
-  !tsmax=130.0*24.*3600.
    tsmin=beg_time
    tsmax=end_time
-  !call get_spawn_range(ngroups,igroups,tsmin,tsmax)
-write(*,*)beg_time,end_time,tsmin,tsmax,fbeg,fend
+  call get_spawn_range(ngroups,igroups,tsmin,tsmax)
   call check_times(beg_time,end_time,tsmin,tsmax,fbeg,fend)
 
   !===================================================================
@@ -132,7 +129,7 @@ write(*,*)beg_time,end_time,tsmin,tsmax,fbeg,fend
   call drawline("-") ; write(*,*)'Beginning Sim' ; call drawline("-")
 
   t = beg_time
-  nits = (end_time-beg_time)/deltaT+1
+  nits = day_2_sec*(end_time-beg_time)/deltaT
     !---------------------------------------------------------
    if(maxval(igroups%space_dim) > 1) then
     call update_forcing(t,3)
@@ -145,8 +142,9 @@ write(*,*)beg_time,end_time,tsmin,tsmax,fbeg,fend
     !call exchange_forcing
     endif
   do its=1,nits
+    t = t + deltaT*sec_2_day
 
-      t = t + deltaT
+    !  write(*,'(I10,F10.2)')its,t
     !---------------------------------------------------------
     ! update forcing to time t    
     !---------------------------------------------------------
@@ -251,14 +249,15 @@ Subroutine setup
     write(*,*)'fatal error: could not read fiscm namelist from',trim(runcontrol)
     stop
   endif
+
+  !set begin/end time 
+  beg_time = beg_time_days
+  end_time = end_time_days
+
   !sanity on number of gruops 
   if(ngroups < 1)then
     write(*,*)'Fatal error: number of groups < 1' ; stop 
   endif
-
-  !set begin/end time in seconds
-  beg_time = beg_time_days*day_2_sec
-  end_time = end_time_days*day_2_sec
 
   !set simulation direction based on order of begin/end times
   if(end_time /= beg_time)then
@@ -275,7 +274,6 @@ Subroutine setup
     fend = -1.0
 !    call open_forcing_file(trim(forcing_file),fbeg,fend) 
      call open_forcing_file(forcing_file,nfiles_in,fbeg,fend)
-
   endif
 
   !report
@@ -336,14 +334,14 @@ Subroutine check_times(mbeg,mend,smin,smax,fbeg,fend)
   write(*,*)'   simulation begin/end time'
   write(*,*)'   model forcing begin/end time (if applicable)'
   call drawline('.')
-  write(*,*)'time of latest   spawning: ',gettime(int(smax))
-  write(*,*)'time of earliest spawning: ',gettime(int(smin))
+  write(*,*)'time of latest   spawning: ',smax 
+  write(*,*)'time of earliest spawning: ',smin
   if(fbeg >= 0.0 .and. fend >= 0.0)then
-    write(*,*)'netcdf forcing start time: ',gettime(int(fbeg))
-    write(*,*)'netcdf forcing end time  : ',gettime(int(fend))
+    write(*,*)'netcdf forcing start time: ',fbeg
+    write(*,*)'netcdf forcing end time  : ',fend
   endif
-  write(*,*)'model simulation beg time: ',gettime(int(mbeg))
-  write(*,*)'model simulation end time: ',gettime(int(mend))
+  write(*,*)'model simulation beg time: ',mbeg
+  write(*,*)'model simulation end time: ',mend
 
   istop = .false.
   tmin = min(mend,mbeg)

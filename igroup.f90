@@ -28,11 +28,11 @@ real(sp) :: tlast_out,start_out
 real(sp) :: group_deltat
 real(sp) :: hdiff_const_val,vdiff_const_val
 logical  :: biology
-character(len=fstr) :: group_name,fname_out
+character(len=fstr) :: init_pos_file,group_name,fname_out
 character(len=fstr) :: statefile,paramfile
 
 Namelist /NML_GROUP/     &
-   & Tnind,              &
+   & init_pos_file,      &
    & space_dim,          &
    & group_name,         &
    & hdiff_type,         &
@@ -87,6 +87,7 @@ type igroup
   real(sp)            :: start_out
   integer             :: frame_out
   integer             :: fid_out
+  character(len=fstr) :: init_pos_file
   character(len=fstr) :: fname_out
   character(len=fstr) :: statefile
   character(len=fstr) :: paramfile
@@ -128,6 +129,20 @@ function group_(fid,id,deltaT) result(g)
     stop
   endif
 
+  !make sure initial condition file exists 
+  inquire(exist=fexist,file=trim(init_pos_file))
+  if(.not.fexist)then
+    write(*,*)'initiali condition file: ',trim(init_pos_file),' does not exist'
+    stop
+  endif
+  
+  !open initial condition file to get problem size
+  open(unit=33,file=trim(init_pos_file),form='formatted')
+  read(33,*)Tnind
+  close(33)
+
+  write(*,*)'initializing group: ',id,' with number of individuals: ',Tnind
+
   !check problem size
   if(Tnind < 1)then
     write(*,*) 'error creating group: size must be greater than 0'
@@ -143,6 +158,7 @@ function group_(fid,id,deltaT) result(g)
   g%DT_bio = intvl_bio*deltaT
 
   g%id     = id           
+  g%init_pos_file = init_pos_file
   g%Tnind  = Tnind   
   g%nind   = Tnind    
   g%space_dim = space_dim
@@ -174,7 +190,7 @@ function group_(fid,id,deltaT) result(g)
     fval=0.;call add_state(g,'xn','x location at last time step','m',NETCDF_NO,fval)
     fval=0.;call add_state(g,'yn','y location at last time step','m',NETCDF_NO,fval)
     fval=0.;call add_state(g,'h','bathymetry','m',NETCDF_YES,fval)
-    fval=0.;call add_state(g,'pathlength','integrated trajectory','m',NETCDF_YES,fval)
+    !fval=0.;call add_state(g,'pathlength','integrated trajectory','m',NETCDF_YES,fval)
     ival=0 ;call add_state(g,'cell','cell containing particle','-',NETCDF_YES,ival)
   endif
   if(g%space_dim == 2)then
@@ -216,6 +232,7 @@ subroutine group_addstates(g)
   endif
 
   open(unit=iunit,file=trim(g%statefile),form='formatted')
+  write(*,*)'reading: ',g%nstate_ud,' statevar'
   do ns = 1,g%nstate_ud
 
     !read the group namelist from unit fid
@@ -509,11 +526,12 @@ function checkstatus(ng,g,time) result(validsim)
      nTOTAL = nTOTAL + NI 
    end do
    dumphead = dumphead + 1
-   if(mod(dumphead-1,15)==0)then
+   if(mod(dumphead-1,5)==0)then
      write(*,102)
      dumphead = 1
    endif
-   write(*,101)gettime(int(time)),nTOTAL,nSETTLED,nDEAD,nACTIVE,nEXITED,nUNKNOWN
+   !write(*,101)gettime(int(time)),nTOTAL,nSETTLED,nDEAD,nACTIVE,nEXITED,nUNKNOWN
+   write(*,103)time,nTOTAL,nSETTLED,nDEAD,nACTIVE,nEXITED,nUNKNOWN
 
 
    if(nACTIVE + nUNKNOWN == 0)then
@@ -525,6 +543,7 @@ function checkstatus(ng,g,time) result(validsim)
   
  101 format(A13,1X,I8,1X,I8,1X,I8,1X,I8,1X,I8,1X,I8) 
  102 format("   simtime   ",5x," TOTAL  ",1x,"SETTLED",1x,"  DEAD  ",1X," ACTIVE ",1X," EXITED ",1x," UNKNOWN") 
+ 103 format(F13.2,1X,I8,1X,I8,1X,I8,1X,I8,1X,I8,1X,I8) 
 
 end function checkstatus
 

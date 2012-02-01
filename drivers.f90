@@ -241,7 +241,7 @@ subroutine activate(ng,g,t,direction)
       np = g(n)%nind
       do p=1,np
         if(istatus(p) == UNKNOWN .and. t >= tspawn(p)) istatus(p) = ACTIVE
-        if(t <= zptini(p)) istatus(p) = UNKNOWN
+        !gwc if(t <= zptini(p)) istatus(p) = UNKNOWN
       end do
     end do
   !reverse model
@@ -252,7 +252,7 @@ subroutine activate(ng,g,t,direction)
       np = g(n)%nind
       do p=1,np
         if(istatus(p) == 0 .and. t <= tspawn(p)) istatus(p) = 1
-        if(t >= zptini(p)) istatus(p) = UNKNOWN
+        !gwc if(t >= zptini(p)) istatus(p) = UNKNOWN
 
       end do
     end do

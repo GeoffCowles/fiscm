@@ -28,7 +28,7 @@ module utilities
   public ran_from_range 
   public unitrand 
   public normal 
-  public spline
+!  public spline
   public normal_circle
   public random_square
 
@@ -313,45 +313,45 @@ function gettime(insecs) result(instring)
   ! ypn:  boundary condition at i=n
   !  ys:  spline
   !-----------------------------------------------
-  subroutine spline(n,x,y,yp1,ypn,ysp)
-
-    integer,  intent(in ) :: n
-    real(sp), intent(in ) :: x(n)
-    real(sp), intent(in ) :: y(n)
-    real(sp), intent(in ) :: yp1
-    real(sp), intent(in ) :: ypn
-    real(sp), intent(out) :: ysp(n)  
-    !------------------------------
-    integer, parameter :: nmax = 50
-    integer  :: i,k
-    real(sp) :: p,qn,sig,un,u(nmax)
-  
-    if (yp1.gt..99e30) then
-        ysp(1)=0.
-        u(1)=0.
-     else
-        ysp(1)=-0.5
-        u(1)=(3./(x(2)-x(1)))*((y(2)-y(1))/(x(2)-x(1))-yp1)
-     endif
-     do i=2,n-1
-        sig=(x(i)-x(i-1))/(x(i+1)-x(i-1))
-        p=sig*ysp(i-1)+2.
-        ysp(i)=(sig-1.)/p
-        u(i)=(6.*((y(i+1)-y(i))/(x(i+1)-x(i))-(y(i)-y(i-1))/(x(i)-x(i-1)))/(x(i+1)-x(i-1))--sig*u(i-1))/p
-     end do
-     if (ypn.gt..99e30) then
-        qn=0.
-        un=0.
-     else
-        qn=0.5
-        un=(3./(x(n)-x(n-1)))*(ypn-(y(n)-y(n-1))/(x(n)-x(n-1)))
-     endif
-     ysp(n)=(un-qn*u(n-1))/(qn*ysp(n-1)+1.)
-     do k=n-1,1,-1
-        ysp(k)=ysp(k)*ysp(k+1)+u(k)
-     end do
-     return
-  end subroutine spline
+!   subroutine spline(n,x,y,yp1,ypn,ysp)
+! 
+!     integer,  intent(in ) :: n
+!     real(sp), intent(in ) :: x(n)
+!     real(sp), intent(in ) :: y(n)
+!     real(sp), intent(in ) :: yp1
+!     real(sp), intent(in ) :: ypn
+!     real(sp), intent(out) :: ysp(n)  
+!     !------------------------------
+!     integer, parameter :: nmax = 50
+!     integer  :: i,k
+!     real(sp) :: p,qn,sig,un,u(nmax)
+!   
+!     if (yp1.gt..99e30) then
+!         ysp(1)=0.
+!         u(1)=0.
+!      else
+!         ysp(1)=-0.5
+!         u(1)=(3./(x(2)-x(1)))*((y(2)-y(1))/(x(2)-x(1))-yp1)
+!      endif
+!      do i=2,n-1
+!         sig=(x(i)-x(i-1))/(x(i+1)-x(i-1))
+!         p=sig*ysp(i-1)+2.
+!         ysp(i)=(sig-1.)/p
+!         u(i)=(6.*((y(i+1)-y(i))/(x(i+1)-x(i))-(y(i)-y(i-1))/(x(i)-x(i-1)))/(x(i+1)-x(i-1))--sig*u(i-1))/p
+!      end do
+!      if (ypn.gt..99e30) then
+!         qn=0.
+!         un=0.
+!      else
+!         qn=0.5
+!         un=(3./(x(n)-x(n-1)))*(ypn-(y(n)-y(n-1))/(x(n)-x(n-1)))
+!      endif
+!      ysp(n)=(un-qn*u(n-1))/(qn*ysp(n-1)+1.)
+!      do k=n-1,1,-1
+!         ysp(k)=ysp(k)*ysp(k+1)+u(k)
+!      end do
+!      return
+!   end subroutine spline
   
   !-----------------------------------------------
   ! return x,y pseudo-normally distributed in 

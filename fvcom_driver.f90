@@ -36,8 +36,11 @@ integer, parameter :: layer_based = 2
 integer, parameter :: nstage = 1
 real(sp),parameter :: alpha(1) = 1.0 
 integer, parameter :: mstage = 4
+
 real(sp),parameter :: A_RK(4) = (/0.0_sp,0.5_sp,0.5_sp,1.0_sp/)
+
 real(sp), parameter:: B_RK(4)  = (/1.0_sp/6.0_sp,1.0_sp/3.0_sp, 1.0_sp/3.0_sp,1.0_sp/6.0_sp/)
+
 real(sp), parameter:: C_RK(4) = (/0.0_sp,0.5_sp,0.5_sp,1.0_sp/)
 !Added by Xinyou Lin
   integer, allocatable :: nbe(:,:)            !!INDICES OF ELMNT NEIGHBORS^M      
@@ -75,7 +78,7 @@ real(sp), pointer :: esiglev(:,:)
 real(sp), pointer :: a1u(:,:)
 real(sp), pointer :: a2u(:,:)
 character(len=10)  :: x_char,y_char,h_char,u_char,v_char, &
-  kh_char,ua_char,va_char,nv_char,aw0_char,awx_char,awy_char,a1u_char, &
+  kh_char,ua_char,va_char,nv_char,nbe_char,aw0_char,awx_char,awy_char,a1u_char, &
   a2u_char,nele_char,node_char,zeta_char,omega_char,         &
   siglay_char,siglev_char,wu_char,wv_char
   Namelist /NML_NCVAR/  &
@@ -85,6 +88,7 @@ character(len=10)  :: x_char,y_char,h_char,u_char,v_char, &
           nv_char,   &
         nele_char,   &
         node_char,   &
+         nbe_char,   &
          aw0_char,   &
          awx_char,   &
          awy_char,   &
@@ -208,6 +212,7 @@ subroutine ocean_model_init(ng,g,lsize,varlist)
   allocate(awx(N_elems,3)) ; awx = zero
   allocate(awy(N_elems,3)) ; awy = zero
   allocate(tri(N_elems,3))
+  allocate(nbe(N_elems,3))
   allocate(siglay(N_verts,N_lay))
   allocate(siglev(N_verts,N_lev))
   allocate(esiglay(N_elems,N_lay))
@@ -219,7 +224,7 @@ subroutine ocean_model_init(ng,g,lsize,varlist)
   !----------------Node, Boundary Condition, and Control Volume-----------------------!
 
  
-  ALLOCATE(NBE(0:N_elems,3))          ;NBE      = 0  !!INDICES OF ELEMENT NEIGHBORS
+  !ALLOCATE(NBE(0:N_elems,3))          ;NBE      = 0  !!INDICES OF ELEMENT NEIGHBORS
   ALLOCATE(NTVE(0:N_verts))           ;NTVE     = 0
   ALLOCATE(ISONB(0:N_verts))          ;ISONB    = 0  !!NODE MARKER = 0,1,2
   ALLOCATE(ISBCE(0:N_elems))          ;ISBCE    = 0
@@ -243,6 +248,9 @@ subroutine ocean_model_init(ng,g,lsize,varlist)
   msg = "error reading nv coordinate"
   call ncdchk( nf90_inq_varid(fid,nv_char,varid),msg )
   call ncdchk(nf90_get_var(fid, varid, tri),msg)
+      msg = "error reading nbe"
+  call ncdchk( nf90_inq_varid(fid,nbe_char,varid),msg )
+  call ncdchk(nf90_get_var(fid, varid, nbe),msg)
   msg = "error reading aw0"
   !read aw0 if they exist, otherwise use 1st order interpolation
   if(ncdscan( nf90_inq_varid(fid,aw0_char,varid),msg ) )then
@@ -337,7 +345,9 @@ subroutine ocean_model_init(ng,g,lsize,varlist)
   !for searching element containing point
 
   !mark boundary elements
-  CALL TRIANGLE_GRID_EDGE
+  write(*,*)'tri grid edge'
+  !CALL TRIANGLE_GRID_EDGE
+  write(*,*)'done tge' 
   grid_metrics = .true.
 
 
@@ -867,6 +877,7 @@ subroutine advect3D(g,deltaT,np,time)
      !!Calculate Velocity Field for Stage N Using C_RK Coefficients
      !interpolate velocity field to particle position
 
+  !write(*,*)np,pdx,pdy,pdz,cell,istatus,u_char,u1
   call interp(np,pdx,pdy,pdz,cell,istatus,u_char,u1,3)
   call interp(np,pdx,pdy,pdz,cell,istatus,v_char,v1,3)
   call interp(np,pdx,pdy,pdz,cell,istatus,omega_char,w1,3) !wts means omega
@@ -979,7 +990,7 @@ end do
 
 
   !--Calculate Particle Location in Cartesian Vertical Coordinate----------------!
-  z = s*(h+zeta)  + zeta
+  z = h !s*(h+zeta)  + zeta
 
   
   !disassociate pointers
@@ -1018,6 +1029,9 @@ subroutine interp_float2D(np,x,y,cell,istatus,vname,v,iframe)
 
   !point to forcing variable
   call get_forcing(trim(vname),field,iframe) 
+
+  !initialize v
+  v = 0.0
 
   !determine the dimensions
   d1 = size(field,1)
@@ -1133,6 +1147,8 @@ subroutine interp_float3D(np,x,y,s,cell,istatus,vname,v,iframe)
   
   call get_forcing(trim(vname),field,iframe) 
   
+  !initialize v
+  v = 0.0
 
   !determine the dimensions
   d1 = size(field,1)

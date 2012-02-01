@@ -128,6 +128,8 @@ subroutine update_forcing(t,iframe0)
   endif
 
   call interp_two_frames(frame(iframe0),t,frame(1),frame(2))
+  !call frame_info(frame(1),FRAME_STATS)
+  !call frame_info(frame(2),FRAME_STATS)
  
 end subroutine update_forcing
 
@@ -142,7 +144,6 @@ subroutine setup_forcing(nvars,varlist)
   integer, intent(in) :: nvars
   character(len=*)    :: varlist(nvars)
   integer i
-write(*,*)varlist  
   frame(1) = frame_(nvars,varlist,1)
   frame(2) = frame_(nvars,varlist,2)
   frame(3) = frame_(nvars,varlist,3)
@@ -312,7 +313,6 @@ subroutine read_frame(frame,f)
   integer :: i,varid,ndims,ttype,stat
   integer, allocatable, dimension(:) :: start,vsize
 
-
   !make sure frame is in bounds
   if(f > nframes .or. f < 1)then
     write(*,*)'error in read_frame'
@@ -367,6 +367,7 @@ subroutine read_frame(frame,f)
   !set initial_frame to .true. will no longer read non-time-varying vars
   frame%initial_read = .true.
 
+!  call frame_info(frame,FRAME_STATS)
   
 
 end subroutine read_frame
@@ -402,7 +403,7 @@ subroutine interp_two_frames(frame,t,frame1,frame2) !result(frame)
     ndims = frame1%fdata(i)%ndims
     if(dtype == flt_type)then
       if(ndims == 1) frame%fdata(i)%f1 = c1*frame1%fdata(i)%f1 + c2*frame2%fdata(i)%f1
-      if(ndims == 2) frame%fdata(i)%f2 = c1*frame1%fdata(i)%f2 + c2*frame2%fdata(i)%f2
+      if(ndims == 2) frame%fdata(i)%f2 = c1*frame1%fdata(i)%f2 + c2*frame2%fdata(i)%f2 
       if(ndims == 3) frame%fdata(i)%f3 = c1*frame1%fdata(i)%f3 + c2*frame2%fdata(i)%f3
       if(ndims == 4) frame%fdata(i)%f4 = c1*frame1%fdata(i)%f4 + c2*frame2%fdata(i)%f4
     else
@@ -706,7 +707,7 @@ subroutine exchange_forcing
   integer  :: d1,d2,d3,d4
 
 
-  !loop over vars, exchage frame
+  !loop over vars, exchange frame
   do i=1,frame(now)%nvars
     dtype = frame(now)%fdata(i)%dtype
     ndims = frame(now)%fdata(i)%ndims
@@ -786,11 +787,11 @@ write(*,*)ffile_in
   deallocate(tmptime)
   !read units on time to see if conversion from days to seconds is necessary
   if ( n == nfls ) then
-     ftimes = ftimes - 43*365.0
-  if ( nf90_get_att(ffile_id, varid, 'units', tunits) == nf90_noerr)then
-    if(index(tunits,'day') /= 0) ftimes = ftimes*day_2_sec
-    write(*,*)'%%%%%% converting netcdf time units to seconds!!!!'
-  endif
+!     ftimes = ftimes - 43*365.0  !gwc what is this?
+!  if ( nf90_get_att(ffile_id, varid, 'units', tunits) == nf90_noerr)then
+!    if(index(tunits,'day') /= 0) ftimes = ftimes*day_2_sec
+!    write(*,*)'%%%%%% converting netcdf time units to seconds!!!!'
+!  endif
   endif
   fid_ft(uD_extant-nfsnrec(n)+1 : uD_extant  ) = ffile_id
   rec_ft(uD_extant-nfsnrec(n)+1 : uD_extant  ) = (/(i,i=1,nfsnrec(n))/)
@@ -818,8 +819,8 @@ write(*,*)ffile_in
   call drawline('-')
   write(*,*)'Opened up model forcing file: ',ffiles_in
   write(*,*)'number of frames in file: ',nfsnrec
-  write(*,*)'forcing begins at:',gettime(int(fbeg)),fbeg
-  write(*,*)'forcing ends   at:',gettime(int(fend)),fend
+  write(*,*)'forcing begins at:',fbeg !gettime(int(fbeg)),fbeg
+  write(*,*)'forcing ends   at:',fend !gettime(int(fend)),fend
   call drawline('-')
 
 end subroutine open_forcing_file

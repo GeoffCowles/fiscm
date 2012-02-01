@@ -235,7 +235,7 @@ subroutine output_group(g,time)
   endif
 
   !dump time
-  call cfcheck( nf90_put_var(g%fid_out,time_vid,time/(3600*24),START=dims) )
+  call cfcheck( nf90_put_var(g%fid_out,time_vid,time,START=dims) )
 
   !dump state variable data
   call write_cdf_data(g%state,g%fid_out,g%frame_out)
