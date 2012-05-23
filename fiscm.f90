@@ -121,6 +121,7 @@ Program fiscm
    tsmin=beg_time
    tsmax=end_time
   call get_spawn_range(ngroups,igroups,tsmin,tsmax)
+   beg_time=FLOOR(tsmin)
   call check_times(beg_time,end_time,tsmin,tsmax,fbeg,fend)
 
   !===================================================================
