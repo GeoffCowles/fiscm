@@ -1486,7 +1486,7 @@ function find_element_robust(xp,yp) result(elem)
        k1 = k - 1
        k2 = k 
        ds = esiglay(cell,k1)-esiglay(cell,k2) 
-       f1 = (my_sloc-esiglev(cell,k2))/ds 
+       f1 = (my_sloc-esiglay(cell,k2))/ds 
        f2 = 1.-f1 
      endif
    !error            
