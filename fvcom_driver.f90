@@ -78,7 +78,7 @@ real(sp), pointer :: esiglev(:,:)
 real(sp), pointer :: a1u(:,:)
 real(sp), pointer :: a2u(:,:)
 character(len=10)  :: x_char,y_char,h_char,u_char,v_char, &
-  kh_char,ua_char,va_char,nv_char,nbe_char,aw0_char,awx_char,awy_char,a1u_char, &
+  kh_char,viscofm_char,ua_char,va_char,nv_char,nbe_char,aw0_char,awx_char,awy_char,a1u_char, &
   a2u_char,nele_char,node_char,zeta_char,omega_char,         &
   siglay_char,siglev_char,wu_char,wv_char
   Namelist /NML_NCVAR/  &
@@ -105,7 +105,8 @@ character(len=10)  :: x_char,y_char,h_char,u_char,v_char, &
            u_char,   &
            v_char,   &
        omega_char,   &
-          kh_char 
+          kh_char,   &
+     viscofm_char 
  
 !
 
@@ -178,6 +179,9 @@ subroutine ocean_model_init(ng,g,lsize,varlist)
       lsize = lsize + 1 ; varlist(lsize) = wv_char
       endif
       lsize = lsize + 1 ; varlist(lsize) = kh_char
+      if (g(n)%hdiff_type ==2)then
+        lsize = lsize + 1 ; varlist(lsize) = viscofm_char
+      endif
     endif
   end do
 
@@ -501,15 +505,85 @@ end subroutine rw_hdiff_constant
 ! Random-Walk horizontal diffusion with spatially
 !   variable turbulent eddy diffusivity
 !
-! Use Visser's modified random walk to compute step
+! Use eddy diffusivity from the model (viscofm)
+! Use Visser's naive random walk to compute step
 !----------------------------------------------------
 subroutine rw_hdiff_variable(g, dT)
+  use utilities, only : unitrand
   type(igroup), intent(inout) :: g
   real(sp), intent(in) :: dT
+  !----------------------------
+  integer,  pointer :: istatus(:)
+  integer,  pointer :: cell(:)
+  real(sp), pointer :: x(:)
+  real(sp), pointer :: y(:)
+  real(sp), pointer :: s(:)
+  real(sp), allocatable :: viscofm(:)
+  real(sp) :: tscale
+  integer  :: i,np
 
-  write(*,*)'error in rw_hdiff_variable'
-  write(*,*)'hdiff visser is not yet setup'
-  stop
+  !set problem size and time step
+  np = g%nind
+
+  !set pointers to particle positions and status
+  call get_state('status',g,istatus)
+  call get_state('cell',g,cell)
+  call get_state('x',g,x)
+  call get_state('y',g,y)
+  call get_state('s',g,s)
+  !allocate local data
+  allocate(viscofm(np))  ; viscofm   = zero 
+
+    !evaluate kh at both locations
+    call interp(np,x,y,s,cell,istatus,viscofm_char,viscofm,3)
+
+    ! => main loop over particles
+    do i=1,np
+      if(istatus(i) < 1)cycle
+
+      !update particle position using Visser modified random walk 
+     tscale = sqrt(2.*dT*viscofm(i))
+
+     if(spherical == 0 )then
+     x(i) = x(i) + unitrand()*tscale
+     y(i) = y(i) + unitrand()*tscale
+     elseif (spherical == 1)then
+     x(:) = x(:)  + unitrand()*tscale/(tpi*COS(y(:)) + 1.0E-6)
+     y(:) = y(:)  + unitrand()*tscale/tpi
+    
+
+     where( x < 0.0_SP)
+     x = x + 360.0_SP
+     end where
+     where( x > 360.0_SP)
+     x = x - 360.0_SP
+     end where
+
+     where( y > 90.0_SP)
+     y = 180.0_SP - y
+     end where
+     where( y < -90.0_SP)
+     y =  - 180.0_SP - y
+     end where
+
+     endif
+
+    end do
+    ! <= end particle loop
+
+
+
+  !deallocate workspace and nullify pointers
+  deallocate(viscofm)
+  nullify(x)
+  nullify(y)
+  nullify(s)
+  nullify(istatus)
+  
+
+
+
+
 
 end subroutine rw_hdiff_variable
 
@@ -719,7 +793,7 @@ subroutine sz_trans(np,g)
 end subroutine sz_trans
 
 !---------------------------------------------------
-! 3-D Advection 
+! 2-D Advection 
 !----------------------------------------------------
 subroutine advect2D(g,deltaT,np)
   integer, intent(in) :: np
@@ -778,11 +852,22 @@ end do
      pdxt(:) = pdxt(:) + deltaT*chix(:,ns)*b_rk(ns)*FLOAT(istatus(:))
      pdyt(:) = pdyt(:) + deltaT*chiy(:,ns)*b_rk(ns)*FLOAT(istatus(:))
   end do
- call find_element(np,x,y,cell,istatus)
-  !--Update Only Particle Still in Water
-  x(:)  = x(:)*(1.0_sp - FLOAT(istatus(:))) + pdxt(:)*FLOAT(istatus(:))
-  y(:)  = y(:)*(1.0_SP - FLOAT(istatus(:))) + pdyt(:)*FLOAT(istatus(:))
+   call find_element(np,pdxt,pdyt,cell,istatus)
+  !x(:)  = x(:)*(1.0_sp - FLOAT(istatus(:))) + pdxt(:)*FLOAT(istatus(:))
+  !y(:)  = y(:)*(1.0_SP - FLOAT(istatus(:))) + pdyt(:)*FLOAT(istatus(:))
 
+  !!--Update Only Particle Still in Water
+  do i=1,np
+    if (istatus(i)==ACTIVE) then
+      x(i)  = pdxt(i)
+      y(i)  = pdyt(i)
+  !!--reset position of particles which are lost from domain to last known position
+    elseif (istatus(i)==EXITED) then
+      istatus(i)=ACTIVE
+    end if
+  end do
+
+ ! call find_element(np,x,y,cell,istatus)
   !disassociate pointers
   nullify(x)
   nullify(y)
@@ -967,10 +1052,20 @@ end do
      endif
 !!!!!
   end do
- call find_element(np,x,y,cell,istatus)
-  !--Update Only Particle Still in Water
-  x(:)  = x(:)*(1.0_sp - FLOAT(istatus(:))) + pdxt(:)*FLOAT(istatus(:))
-  y(:)  = y(:)*(1.0_SP - FLOAT(istatus(:))) + pdyt(:)*FLOAT(istatus(:))
+   call find_element(np,pdxt,pdyt,cell,istatus)
+  !x(:)  = x(:)*(1.0_sp - FLOAT(istatus(:))) + pdxt(:)*FLOAT(istatus(:))
+  !y(:)  = y(:)*(1.0_SP - FLOAT(istatus(:))) + pdyt(:)*FLOAT(istatus(:))
+
+  !!--Update Only Particle Still in Water
+  do i=1,np
+    if (istatus(i)==ACTIVE) then
+      x(i)  = pdxt(i)
+      y(i)  = pdyt(i)
+  !!--reset position of particles which are lost from domain to last known position
+    elseif (istatus(i)==EXITED) then
+      istatus(i)=ACTIVE
+    end if
+  end do
   s(:)  = pdzt(:)
   !--Adjust Depth of Updated Particle Positions----------------------------------!
   s = max(s,-(2.0+s))                 !Reflect off Bottom
@@ -982,8 +1077,9 @@ end do
 
   !--Sigma adjustment if fixed depth tracking------------------------------------!
   if(fix_dep == 1)then
-      s = (-zpini)/(h+zeta)  !  THIS IS REALLY PDZN = ((-LAG%ZPIN+EP) - EP)/(HP+EP)
-                             !  WHERE ZPINI IS THE SPECIFIED FIXED DEPTH RELATIVE TO THE SS
+     ! s = (-zpini)/(h+zeta)  !  THIS IS REALLY PDZN = ((-LAG%ZPIN+EP) - EP)/(HP+EP)
+     !                        !  WHERE ZPINI IS THE SPECIFIED FIXED DEPTH RELATIVE TO THE SS
+      s  = zpini/(h + zeta)
       s = max(s,-1.0_SP)     ! Depth can change though if particle goes into shallower areas
 
   endif
