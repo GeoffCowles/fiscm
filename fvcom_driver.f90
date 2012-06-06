@@ -468,11 +468,11 @@ subroutine rw_hdiff_constant(g, dT)
 !    x(i) = x(i) + normal()*tscale
 !    y(i) = y(i) + normal()*tscale
      if(spherical == 0 )then
-     x(i) = x(i) + unitrand()*tscale
-     y(i) = y(i) + unitrand()*tscale
+     x(i) = x(i) + normal()*tscale
+     y(i) = y(i) + normal()*tscale
      elseif (spherical == 1)then
-     x(:) = x(:)  + unitrand()*tscale/(tpi*COS(y(:)) + 1.0E-6)
-     y(:) = y(:)  + unitrand()*tscale/tpi
+     x(:) = x(:)  + normal()*tscale/(tpi*COS(y(:)) + 1.0E-6)
+     y(:) = y(:)  + normal()*tscale/tpi
     
 
      where( x < 0.0_SP)
@@ -509,7 +509,7 @@ end subroutine rw_hdiff_constant
 ! Use Visser's naive random walk to compute step
 !----------------------------------------------------
 subroutine rw_hdiff_variable(g, dT)
-  use utilities, only : unitrand
+  use utilities, only : normal
   type(igroup), intent(inout) :: g
   real(sp), intent(in) :: dT
   !----------------------------
@@ -545,11 +545,11 @@ subroutine rw_hdiff_variable(g, dT)
      tscale = sqrt(2.*dT*viscofm(i))
 
      if(spherical == 0 )then
-     x(i) = x(i) + unitrand()*tscale
-     y(i) = y(i) + unitrand()*tscale
+     x(i) = x(i) + normal()*tscale
+     y(i) = y(i) + normal()*tscale
      elseif (spherical == 1)then
-     x(:) = x(:)  + unitrand()*tscale/(tpi*COS(y(:)) + 1.0E-6)
-     y(:) = y(:)  + unitrand()*tscale/tpi
+     x(:) = x(:)  + normal()*tscale/(tpi*COS(y(:)) + 1.0E-6)
+     y(:) = y(:)  + normal()*tscale/tpi
     
 
      where( x < 0.0_SP)
@@ -594,7 +594,7 @@ end subroutine rw_hdiff_variable
 !   - use Vissers modified random walk to compute jump
 !----------------------------------------------------
 subroutine rw_vdiff(g, dT, nstep)
-  use utilities, only : unitrand
+  use utilities, only : normal
   type(igroup), intent(inout) :: g
   real(sp), intent(in) :: dT
   integer,  intent(in) :: nstep
@@ -669,7 +669,7 @@ subroutine rw_vdiff(g, dT, nstep)
       !update particle position using Visser modified random walk 
       depth  = h(p)+zeta(p)
       dkh_dz = dkh_ds(p)/depth
-      dz     = dkh_dz*deltaT + unitrand()*sqrt(fac*kh(p)) !Visser-modified
+      dz     = dkh_dz*deltaT + normal()*sqrt(fac*kh(p)) !Visser-modified
       s(p)   = s(p) + dz/depth
 !      dz     = unitrand()*sqrt(2.*kh(p))                 !naive
 
