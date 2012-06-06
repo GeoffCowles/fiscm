@@ -248,27 +248,8 @@ function gettime(insecs) result(instring)
     implicit none 
     real(sp), intent(in) ::  mean
     real(sp), intent(in) ::  sigma 
-    integer  :: flag 
-    real(sp) :: fac,gsave,rsq,r1,r2,tmp
-    save flag,gsave 
-    data flag /0/ 
-    if (flag == 0) then 
-      rsq=2.0_sp 
-      do while(rsq >= 1.0_sp.or.rsq == 0.0_sp) 
-        r1=2.0_sp*ran1()-1.0_sp 
-        r2=2.0_sp*ran1()-1.0_sp 
-        rsq=r1*r1+r2*r2 
-      enddo 
-      fac=sqrt(-2.0_sp*log(rsq)/rsq) 
-      gsave=r1*fac 
-      tmp=r2*fac 
-      flag=1 
-    else 
-      tmp=gsave 
-      flag=0 
-    endif 
     
-    normal=tmp*sigma+mean !tmp is distribution of standard normal
+    normal=normal_zeromean()*sigma+mean !normal_zeromean() is distribution of standard normal
     return 
   end function normal
 
@@ -279,26 +260,14 @@ function gettime(insecs) result(instring)
   !-----------------------------------------------
   function normal_zeromean() result(normal)
     implicit none 
-    integer  :: flag 
-    real(sp) :: fac,gsave,rsq,r1,r2
+    real(sp) :: r1,r2
     real(sp) :: normal
-    save flag,gsave 
-    data flag /0/ 
-    if (flag == 0) then 
-      rsq=2.0_sp 
-      do while(rsq >= 1.0_sp.or.rsq == 0.0_sp) 
-        r1=2.0_sp*ran1()-1.0_sp 
-        r2=2.0_sp*ran1()-1.0_sp 
-        rsq=r1*r1+r2*r2 
-      enddo 
-      fac=sqrt(-2.0_sp*log(rsq)/rsq) 
-      gsave=r1*fac 
-      normal=r2*fac 
-      flag=1 
-    else 
-      normal=gsave 
-      flag=0 
-    endif 
+    real(sp),parameter :: PI = 3.14159265358979
+
+    r1 = ran1()
+    r2 = ran1()
+    normal = sqrt(DBLE(-2.)*log(r1)) * cos(DBLE(2.)*PI*r2)
+
     return 
   end function normal_zeromean
 
