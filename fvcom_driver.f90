@@ -468,52 +468,52 @@ subroutine rw_hdiff_constant(g, dT)
   tscale = sqrt(2.*dT*g%hdiff_const_val)
 
   !horizontal random walk
-  do i=1,np
-    if(istatus(i) /= ACTIVE)cycle
-!    x(i) = x(i) + normal()*tscale
-!    y(i) = y(i) + normal()*tscale
      if(spherical == 0 )then
-     pdxt(i) = x(i) + normal()*tscale
-     pdyt(i) = y(i) + normal()*tscale
+      where(istatus == ACTIVE)
+       pdxt = x + normal()*tscale
+       pdyt = y + normal()*tscale
+      end where
      elseif (spherical == 1)then
-     pdxt(i) = x(i)  + normal()*tscale/(tpi*COS(y(i)) + 1.0E-6)
-     pdyt(i) = y(i)  + normal()*tscale/tpi
-    
+      where(istatus == ACTIVE)
+       pdxt = x  + normal()*tscale/(tpi*COS(y) + 1.0E-6)
+       pdyt = y  + normal()*tscale/tpi
+      end where
 
-     where( x < 0.0_SP)
-     x = x + 360.0_SP
-     end where
-     where( x > 360.0_SP)
-     x = x - 360.0_SP
-     end where
+      where( pdxt < 0.0_SP)
+      pdxt = pdxt + 360.0_SP
+      end where
+      where( pdxt > 360.0_SP)
+      pdxt = pdxt - 360.0_SP
+      end where
 
-     where( y > 90.0_SP)
-     y = 180.0_SP - y
-     end where
-     where( y < -90.0_SP)
-     y =  - 180.0_SP - y
-     end where
-
+      where( pdyt > 90.0_SP)
+      pdyt = 180.0_SP - pdyt
+      end where
+      where( pdyt < -90.0_SP)
+      pdyt =  - 180.0_SP - pdyt
+      end where
      endif
 
-  end do
+
+     
 
   call find_element(np,pdxt,pdyt,cell,istatus)
   !!--Update Only Particle Still in Water
-  do i=1,np
-    if (istatus(i)==ACTIVE) then
-      x(i)  = pdxt(i)
-      y(i)  = pdyt(i)
+  
+    where(istatus==ACTIVE)
+      x  = pdxt
+      y  = pdyt
+    end where
   !!--reset position of particles which are lost from domain to last known position
-    elseif (istatus(i)==EXITED) then
-      istatus(i)=ACTIVE
-    end if
-  end do
+    where(istatus==EXITED)
+      istatus=ACTIVE
+    end where
 
   !nullify pointers
   nullify(x)
   nullify(y)
   nullify(istatus)
+  nullify(cell)
   deallocate(pdxt)
   deallocate(pdyt)
 
@@ -537,8 +537,8 @@ subroutine rw_hdiff_variable(g, dT)
   real(sp), pointer :: x(:)
   real(sp), pointer :: y(:)
   real(sp), pointer :: s(:)
-  real(sp), allocatable :: viscofm(:)
-  real(sp) :: tscale
+  real(sp), allocatable :: viscofm(:), pdxt(:), pdyt(:)
+  real(sp), allocatable :: tscale(:)
   integer  :: i,np
 
   !set problem size and time step
@@ -552,52 +552,69 @@ subroutine rw_hdiff_variable(g, dT)
   call get_state('s',g,s)
   !allocate local data
   allocate(viscofm(np))  ; viscofm   = zero 
+  allocate(tscale(np))  ; tscale   = zero 
+  allocate(pdxt(np))  ;
+  allocate(pdyt(np))  ;
 
     !evaluate kh at both locations
     call interp(np,x,y,s,cell,istatus,viscofm_char,viscofm,3)
 
-    ! => main loop over particles
-    do i=1,np
-      if(istatus(i) /= ACTIVE)cycle
-
-      !update particle position using Visser modified random walk 
-     tscale = sqrt(2.*dT*viscofm(i))
-
+    !update particle position using Visser modified random walk 
+     tscale = sqrt(2.*dT*viscofm)
+  !horizontal random walk
      if(spherical == 0 )then
-     x(i) = x(i) + normal()*tscale
-     y(i) = y(i) + normal()*tscale
+      where(istatus == ACTIVE)
+       pdxt = x + normal()*tscale
+       pdyt = y + normal()*tscale
+      end where
      elseif (spherical == 1)then
-     x(:) = x(:)  + normal()*tscale/(tpi*COS(y(:)) + 1.0E-6)
-     y(:) = y(:)  + normal()*tscale/tpi
-    
+      where(istatus == ACTIVE)
+       pdxt = x  + normal()*tscale/(tpi*COS(y) + 1.0E-6)
+       pdyt = y  + normal()*tscale/tpi
+      end where
 
-     where( x < 0.0_SP)
-     x = x + 360.0_SP
-     end where
-     where( x > 360.0_SP)
-     x = x - 360.0_SP
-     end where
+      where( pdxt < 0.0_SP)
+      pdxt = pdxt + 360.0_SP
+      end where
+      where( pdxt > 360.0_SP)
+      pdxt = pdxt - 360.0_SP
+      end where
 
-     where( y > 90.0_SP)
-     y = 180.0_SP - y
-     end where
-     where( y < -90.0_SP)
-     y =  - 180.0_SP - y
-     end where
-
+      where( pdyt > 90.0_SP)
+      pdyt = 180.0_SP - pdyt
+      end where
+      where( pdyt < -90.0_SP)
+      pdyt =  - 180.0_SP - pdyt
+      end where
      endif
 
-    end do
-    ! <= end particle loop
+
+     
+
+  call find_element(np,pdxt,pdyt,cell,istatus)
+  !!--Update Only Particle Still in Water
+  
+    where(istatus==ACTIVE)
+      x  = pdxt
+      y  = pdyt
+    end where
+  !!--reset position of particles which are lost from domain to last known position
+    where(istatus==EXITED)
+      istatus=ACTIVE
+    end where
 
 
 
   !deallocate workspace and nullify pointers
   deallocate(viscofm)
+  deallocate(tscale)
+  deallocate(pdxt)
+  deallocate(pdyt)
   nullify(x)
   nullify(y)
   nullify(s)
   nullify(istatus)
+  nullify(cell)
   
 
 
@@ -871,20 +888,17 @@ end do
      pdxt(:) = pdxt(:) + deltaT*chix(:,ns)*b_rk(ns)*FLOAT(istatus(:))
      pdyt(:) = pdyt(:) + deltaT*chiy(:,ns)*b_rk(ns)*FLOAT(istatus(:))
   end do
-   call find_element(np,pdxt,pdyt,cell,istatus)
-  !x(:)  = x(:)*(1.0_sp - FLOAT(istatus(:))) + pdxt(:)*FLOAT(istatus(:))
-  !y(:)  = y(:)*(1.0_SP - FLOAT(istatus(:))) + pdyt(:)*FLOAT(istatus(:))
-
+  call find_element(np,pdxt,pdyt,cell,istatus)
   !!--Update Only Particle Still in Water
-  do i=1,np
-    if (istatus(i)==ACTIVE) then
-      x(i)  = pdxt(i)
-      y(i)  = pdyt(i)
+  
+    where(istatus==ACTIVE)
+      x  = pdxt
+      y  = pdyt
+    end where
   !!--reset position of particles which are lost from domain to last known position
-    elseif (istatus(i)==EXITED) then
-      istatus(i)=ACTIVE
-    end if
-  end do
+    where(istatus==EXITED)
+      istatus=ACTIVE
+    end where
 
  ! call find_element(np,x,y,cell,istatus)
   !disassociate pointers
@@ -1071,20 +1085,17 @@ end do
      endif
 !!!!!
   end do
-   call find_element(np,pdxt,pdyt,cell,istatus)
-  !x(:)  = x(:)*(1.0_sp - FLOAT(istatus(:))) + pdxt(:)*FLOAT(istatus(:))
-  !y(:)  = y(:)*(1.0_SP - FLOAT(istatus(:))) + pdyt(:)*FLOAT(istatus(:))
-
+  call find_element(np,pdxt,pdyt,cell,istatus)
   !!--Update Only Particle Still in Water
-  do i=1,np
-    if (istatus(i)==ACTIVE) then
-      x(i)  = pdxt(i)
-      y(i)  = pdyt(i)
+  
+    where(istatus==ACTIVE)
+      x  = pdxt
+      y  = pdyt
+    end where
   !!--reset position of particles which are lost from domain to last known position
-    elseif (istatus(i)==EXITED) then
-      istatus(i)=ACTIVE
-    end if
-  end do
+    where(istatus==EXITED)
+      istatus=ACTIVE
+    end where
   s(:)  = pdzt(:)
   !--Adjust Depth of Updated Particle Positions----------------------------------!
   s = max(s,-(2.0+s))                 !Reflect off Bottom
