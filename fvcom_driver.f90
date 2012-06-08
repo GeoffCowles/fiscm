@@ -797,21 +797,22 @@ subroutine sz_trans(np,g)
   real(sp), pointer :: s(:)
   real(sp), pointer :: z(:)
   real(sp), pointer :: h(:)
+  real(sp), pointer :: zeta(:)
   integer , pointer :: cell(:)
   integer , pointer :: istatus(:)
-  real(sp), dimension(np)  :: zeta
   call get_state('x',g,x)
   call get_state('y',g,y)
   call get_state('s',g,s)
   call get_state('z',g,z)
   call get_state('h',g,h)
+  call get_state('zeta',g,zeta)
   call get_state('status',g,istatus)
   call get_state('cell',g,cell)
 
   call interp(np,x,y,cell,istatus,zeta_char,zeta,3)
   call interp(np,x,y,cell,istatus,h_char,h,3)
   if(sz_cor == 1)then
-     z  = -z + zeta 
+!    z  = -z + zeta 
      s  = (z - zeta)/(h + zeta)
   elseif(sz_cor == 0)then
      z  = s*(h + zeta) + zeta
@@ -822,6 +823,7 @@ subroutine sz_trans(np,g)
   nullify(z)
   nullify(h)
   nullify(cell)
+  nullify(zeta)
   nullify(istatus)
 
 
@@ -922,13 +924,15 @@ subroutine advect3D(g,deltaT,np,time)
   real(sp), pointer :: s(:)
   real(sp), pointer :: z(:)
   real(sp), pointer :: h(:)
+  real(sp), pointer :: zeta(:)
   integer , pointer :: cell(:)
   integer , pointer :: istatus(:)
   
   real(sp), dimension(np) :: u,u1,u2,v,v1,v2,w,w1,w2,wm
-  real(sp), dimension(np) :: zeta,zeta1,zeta2,pdx,pdy,pdz
+  real(sp), dimension(np) :: zeta1,zeta2,pdx,pdy,pdz
   real(sp), dimension(np) :: wu,wu1,wu2,wv,wv1,wv2
   real(sp), dimension(np) :: pdxt,pdyt,pdzt
+  real(sp), dimension(np) :: zn
 
   real(sp), dimension(np,0:mstage) :: chix,chiy,chiz  
   real(sp), parameter              :: eps  = 1.0E-5
@@ -944,6 +948,7 @@ subroutine advect3D(g,deltaT,np,time)
   call get_state('s',g,s)
   call get_state('z',g,z)  
   call get_state('h',g,h)
+  call get_state('zeta',g,zeta)
   call get_state('cell',g,cell)
   call get_state('status',g,istatus)
 
@@ -1096,27 +1101,34 @@ end do
     where(istatus==EXITED)
       istatus=ACTIVE
     end where
+  zn = s*(h + zeta) + zeta  
   s(:)  = pdzt(:)
   !--Adjust Depth of Updated Particle Positions----------------------------------!
   s = max(s,-(2.0+s))                 !Reflect off Bottom
   s = min(s,0.0_sp)                      !Don t Pierce Free Surface
 
   !--Evaluate Bathymetry and Free Surface Height at Updated Particle Position----!
-  call interp(np,x,y,cell,istatus,h_char,h,4)
+  call interp(np,x,y,cell,istatus,h_char,h,3)
   call interp(np,x,y,cell,istatus,zeta_char,zeta,4)
 
   !--Sigma adjustment if fixed depth tracking------------------------------------!
   if(fix_dep == 1)then
+      if(sz_cor == 1)then
      ! s = (-zpini)/(h+zeta)  !  THIS IS REALLY PDZN = ((-LAG%ZPIN+EP) - EP)/(HP+EP)
      !                        !  WHERE ZPINI IS THE SPECIFIED FIXED DEPTH RELATIVE TO THE SS
       s  = zpini/(h + zeta)
+      elseif(sz_cor == 0)then
+      s  = (zn-zeta)/(h + zeta)
+      endif
+
       s = max(s,-1.0_SP)     ! Depth can change though if particle goes into shallower areas
 
   endif
 
 
   !--Calculate Particle Location in Cartesian Vertical Coordinate----------------!
-  z = h !s*(h+zeta)  + zeta
+! z = h !s*(h+zeta)  + zeta
+ z = s*(h+zeta)  + zeta
 
   
   !disassociate pointers
@@ -1125,6 +1137,7 @@ end do
   nullify(s)
   nullify(z)
   nullify(h)
+  nullify(zeta)
   nullify(cell)
   nullify(istatus)
 

@@ -202,6 +202,7 @@ function group_(fid,id,deltaT) result(g)
     fval=0.;call add_state(g,'v','y-velocity'  ,'m/s',NETCDF_YES,fval) 
     fval=0.;call add_state(g,'w','w-velocity'  ,'m/s',NETCDF_NO ,fval)
     fval=0.;call add_state(g,'z','z location'  ,'m'  ,NETCDF_YES,fval)
+    fval=0.;call add_state(g,'zeta','surface elevation'  ,'m'  ,NETCDF_YES,fval)
     fval=0.;call add_state(g,'s','s coordinate','-'  ,NETCDF_YES,fval) 
   endif
 
