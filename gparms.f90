@@ -61,7 +61,8 @@ real(sp), parameter :: sec_2_day = one/day_2_sec
 !statistical
 !      rvar:  variance of a uniform random walk [-1,1]
 !----------------------------------------------------------------
-real(sp), parameter :: rvar = a3rd
+!real(sp), parameter :: rvar = a3rd
+real(sp), parameter :: rvar = one
 
 !----------------------------------------------------------------
 !trigonometric
