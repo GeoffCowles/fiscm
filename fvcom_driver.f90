@@ -640,6 +640,7 @@ subroutine rw_vdiff(g, dT, nstep)
   real(sp), pointer :: x(:)
   real(sp), pointer :: y(:)
   real(sp), pointer :: s(:)
+  real(sp), pointer :: z(:)
   real(sp), pointer :: h(:)
   real(sp), allocatable :: kh(:)
   real(sp), allocatable :: kh2(:)
@@ -661,6 +662,7 @@ subroutine rw_vdiff(g, dT, nstep)
   call get_state('x',g,x)
   call get_state('y',g,y)
   call get_state('s',g,s)
+  call get_state('z',g,z)
   call get_state('h',g,h)
   !allocate local data
   allocate(s_shift(np)); s_shift = zero 
@@ -695,7 +697,7 @@ subroutine rw_vdiff(g, dT, nstep)
     dkh_ds = (kh2-kh)/ds
 
     !function evaluation at [z + 0.5*dkh/dz*deltat] - Visser
-    s_shift = s + dkh_ds*deltaT/((h+zeta)**2)
+    s_shift = s + ahalf*dkh_ds*deltaT/((h+zeta)**2)
     call interp(np,x,y,s_shift,cell,istatus,kh_char,kh,3)
 
     ! => main loop over particles
@@ -719,6 +721,9 @@ subroutine rw_vdiff(g, dT, nstep)
   end do
   ! <== end loop over substeps
 
+  !--Calculate Particle Location in Cartesian Vertical Coordinate----------------!
+  z = s*(h+zeta)  + zeta
+
   !deallocate workspace and nullify pointers
   deallocate(ds)
   deallocate(kh)
@@ -730,6 +735,7 @@ subroutine rw_vdiff(g, dT, nstep)
   nullify(y)
   nullify(s)
   nullify(h)
+  nullify(z)
   nullify(istatus)
 
 end subroutine rw_vdiff
