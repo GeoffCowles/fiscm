@@ -112,11 +112,13 @@ contains
 !---------------------------------------------------------
 !Create the initial group type (passive particle)
 !---------------------------------------------------------
-function group_(fid,id,deltaT) result(g)
+function group_(fid,id,deltaT,output_prefix) result(g)
   type(igroup) :: g
   integer, intent(in) :: fid
   integer, intent(in) :: id
   real(sp),intent(in) :: deltaT
+  character(len=fstr), intent(in) :: output_prefix 
+  character(len=1) :: num
   integer :: ios,i,ns
   logical :: fexist
   real(sp) :: fval
@@ -175,13 +177,16 @@ function group_(fid,id,deltaT) result(g)
   g%start_out = start_out
   g%frame_out = 0
   g%fid_out   = 0
-  g%fname_out = ""
   g%nstate = 0 
   g%next   = 0
   g%nstate_ud = nstate
   g%statefile = statefile
   g%paramfile = paramfile
   g%state = pvar_list_() 
+
+  !setup the output file containing group positions
+  write(num,'(I1)') g%id
+  g%fname_out = trim(output_prefix)//'_'//num//'.nc'
 
   !(x,y,z) - particle position
   if(g%space_dim > 1)then

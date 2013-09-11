@@ -71,16 +71,18 @@ end subroutine cdf_out
 subroutine write_header(g)
   type(igroup), intent(inout) :: g
   character(len=fstr)  :: fname
-  character(len=1)     :: num
+  !character(len=1)     :: num
   integer              :: ierr,fid
  
   g%frame_out = 1
-  write(num,'(I1)') g%id
+  !write(num,'(I1)') g%id
   
 
   !construct the name (eventually use some sim string/directory loc)
-  fname = 'fiscm_'//num//'.nc'
-  g%fname_out = fname
+  !fname = 'fiscm_'//num//'.nc'
+  !fname = g%fname_out//'_'//num//'.nc'
+  fname = trim(g%fname_out)
+  !g%fname_out = fname
 
   !open the file - write access
   call cfcheck( nf90_create(trim(fname),nf90_clobber,fid) ) ;  g%fid_out = fid

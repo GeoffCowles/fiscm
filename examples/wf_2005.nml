@@ -1,0 +1,134 @@
+&NML_FISCM
+ beg_time_days   = 53461.,
+ end_time_days   = 53490.,
+ deltaT          = 240,         !advection timestep
+ ireport         = 1,
+ ngroups         = 1,
+ nfiles_in       = 1,
+ forcing_file    = '../FORCING/gom1_gregsub_2005_newnbe.nc',
+ output_prefix   = 'wf_2005_t1',
+ spherical       = 0,
+ sz_cor          = 0,           ! 0 - initial depth is specified in s ;1 - initial depth is specified in z
+ fix_dep         = 1,           ! 1 - fix depth (if sz_cor=0 sigma is fixed; if sz_cor=1 depth below surface is fixed)
+ dvm_bio         = 0,
+ wind_type       = 0,
+ dvmh_up         = 6.0,
+ dvmh_dn         = 1.0
+/
+
+&NML_NCVAR
+          x_char  ='x',
+          y_char  ='y',
+          h_char  ='h',
+         nv_char  ='nv',
+       nele_char  ='nele',
+       node_char  ='node',
+        nbe_char  ='nbe',
+        aw0_char  ='aw0',
+        awx_char  ='awx',
+        awy_char  ='awy',
+        a1u_char  ='a1u',
+        a2u_char  ='a2u',
+     siglay_char  ='siglay',
+     siglev_char  ='siglev',
+         ua_char  ='ua',
+         va_char  ='va',
+       zeta_char  ='zeta',
+          h_char  ='h',
+         wu_char  ='windu',
+         wv_char  ='windv',
+          u_char  ='u',
+          v_char  ='v',
+      omega_char  ='ww',
+         kh_char  ='kh'
+/
+
+
+&NML_GROUP
+ init_pos_file    = 'apr1_apr30_2005_single.dat', 
+ space_dim        = 3,
+ group_name       = 'Test1', 
+ hdiff_type       = 0,
+ hdiff_const_val  = 0.1,
+ vdiff_type       = 0,
+ vdiff_const_val  = 0.0,
+ vdiff_substeps   = 10,
+ intvl_bio        = 5,
+ biology          = T,
+ intvl_out        = 15,
+ start_out        = 0.0,
+ nstate           = 4,
+ statefile        = 'wf_2005.nml',
+ paramfile        = 'wf_2005.nml',
+/
+
+ &NML_STATEVAR
+ state_varname          = 'stage',
+ state_longname         = 'stage',
+ state_units            = '-',
+ state_netcdf_out       = 1,
+ state_vartype          = 1,
+ state_initval_int      = 1,
+ state_initval_flt      = 0.0,
+ state_from_ext_var     = 'NONE'
+/
+
+ &NML_STATEVAR
+ state_varname          = 'tid',
+ state_longname         = 'flag for individuals',
+ state_units            = '-',
+ state_netcdf_out       = 1,
+ state_vartype          = 1,
+ state_initval_int      = 0,
+ state_initval_flt      = 0.0,
+ state_from_ext_var     = 'NONE'
+/
+
+ &NML_STATEVAR
+ state_varname          = 'PASD',
+ state_longname         = 'Model Currency',
+ state_units            = '-',
+ state_netcdf_out       = 0,
+ state_vartype          = 2,
+ state_initval_int      = 1,
+ state_initval_flt      = 0.0,
+ state_from_ext_var     = 'NONE'
+/
+
+ &NML_STATEVAR
+ state_varname          = 'KH',
+ state_longname         = 'eddy diffusivity'
+ state_units            = 'm^2/s',
+ state_netcdf_out       = 1,
+ state_vartype          = 1,
+ state_initval_int      = 0,
+ state_initval_flt      = 0.0,
+ state_from_ext_var     = 'none'
+/
+
+ &NML_STATEVAR
+ state_varname          = 'N',
+ state_longname         = 'number of individuals',
+ state_units            = '-',
+ state_netcdf_out       = 1,
+ state_vartype          = 1,
+ state_initval_int      = 50000,
+ state_initval_flt      = 0.0,
+ state_from_ext_var     = 'NONE'
+/
+
+&NMLX_STATEVAR
+ state_varname          = 'T',
+ state_longname         = 'temperature',
+ state_units            = 'C',
+ state_netcdf_out       = 1,
+ state_vartype          = 2,
+ state_initval_int      = 1,
+ state_initval_flt      = 12.0,
+ state_from_ext_var     = 'temp'
+/
+
+ &NML_WF  
+ days_at_liberty        = 60,
+ some_other_var         = 0.4
+/

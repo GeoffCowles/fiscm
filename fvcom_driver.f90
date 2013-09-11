@@ -350,7 +350,7 @@ subroutine ocean_model_init(ng,g,lsize,varlist)
 
   !mark boundary elements
   write(*,*)'tri grid edge'
-  !CALL TRIANGLE_GRID_EDGE
+  CALL TRIANGLE_GRID_EDGE
   write(*,*)'done tge' 
   grid_metrics = .true.
 
@@ -1119,12 +1119,12 @@ end do
 
   !--Sigma adjustment if fixed depth tracking------------------------------------!
   if(fix_dep == 1)then
-      if(sz_cor == 1)then
+      if(sz_cor == 1)then   ! when initial depth is specified in z
      ! s = (-zpini)/(h+zeta)  !  THIS IS REALLY PDZN = ((-LAG%ZPIN+EP) - EP)/(HP+EP)
      !                        !  WHERE ZPINI IS THE SPECIFIED FIXED DEPTH RELATIVE TO THE SS
       s  = zpini/(h + zeta)
-      elseif(sz_cor == 0)then
-      s  = (zn-zeta)/(h + zeta)
+      elseif(sz_cor == 0)then ! when initial depth is specified in s
+      s  = zpini              !  WHERE ZPINI IS THE SPECIFIED FIXED SIGMA
       endif
 
       s = max(s,-1.0_SP)     ! Depth can change though if particle goes into shallower areas
@@ -1815,7 +1815,7 @@ function find_element_robust(xp,yp) result(elem)
 
         IF(JJB /= 1) THEN
            PRINT*, 'ERROR IN ISONB !,I,J', I,J
-           PAUSE
+           !PAUSE
         END IF
 
         DO J=2,NTVE(I)

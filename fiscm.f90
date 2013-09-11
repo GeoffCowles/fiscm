@@ -25,6 +25,7 @@ Module fiscm_data
   integer  :: ngroups
   integer  :: nfiles_in
   character(len=fstr) :: forcing_file(max_nf)
+  character(len=fstr) :: output_prefix
   
   Namelist /NML_FISCM/ &
       beg_time_days,   & 
@@ -34,6 +35,7 @@ Module fiscm_data
       Ngroups,         &
       Nfiles_in,       &     
       forcing_file,    &
+      output_prefix,   &
       spherical,       &
       sz_cor,          &
       fix_dep,         &
@@ -244,6 +246,7 @@ Subroutine setup
   !--------------------------------------------------------
   ! open and read global namelist:  nml_fiscm 
   !--------------------------------------------------------
+  output_prefix = 'fiscm'
   open(unit=iunit,file=trim(runcontrol),form='formatted')
   read(unit=iunit,nml=nml_fiscm,iostat=ios)
   if(ios /= 0)then
@@ -292,7 +295,7 @@ Subroutine setup
   !---------------------------------------------------
   allocate(igroups(ngroups))
   do n=1,ngroups
-    igroups(n) = group_(iunit,n,deltaT)
+    igroups(n) = group_(iunit,n,deltaT,output_prefix)
   end do
   close(iunit)
 
