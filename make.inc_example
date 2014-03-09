@@ -1,8 +1,8 @@
 #          --- following for oscar/rudy ----
 	  #IOLIBS       =  -L/hosts/mao/usr/medm/install/netcdf/3.6.3/em64t/lib -lnetcdf
           #IOINCS       =  -I/hosts/mao/usr/medm/install/netcdf/3.6.3/em64t/include
-	  IOLIBS       =  -L/opt/netcdf3/ifort_gcc64/lib -lnetcdf 
-          IOINCS       =  -I/opt/netcdf3/ifort_gcc64/include
+	  IOLIBS       =  -L/opt/netcdf3/gnu32/lib -lnetcdf 
+          IOINCS       =  -I/opt/netcdf3/gnu32/include
 
 
 #          --- following for minke ----
@@ -16,18 +16,19 @@
 #--------------------------------------------------------------------------
 # APPLE / gfortran 
 #--------------------------------------------------------------------------
-#         CPPFLAGS = $(DEF_FLAGS)
-#         CPP      = /usr/bin/cpp
-#         FC       = gfortran #-funderscoring # -fno-second-underscore
+         CPPFLAGS = $(DEF_FLAGS)
+         CPP      = /usr/bin/cpp
+         FC       = /usr/local/bin/gfortran #-funderscoring # -fno-second-underscore
 #         FLINK    = /bin/sh /usr/local/netcdf/gfortran/bin/libtool  --mode=link gfortran
-#         DEBFLGS  = 
-#         OPT      = -O3
+         FLINK    = /usr/local/bin/gfortran
+         DEBFLGS  = 
+         OPT      = -O1
 #--------------------------------------------------------------------------
 # LINUX / ifort 
 #--------------------------------------------------------------------------
-        CPPFLAGS = $(DEF_FLAGS)
-         CPP      = /usr/bin/cpp
-         FC       = ifort #-funderscoring # -fno-second-underscore
-         FLINK    = ifort ##/bin/sh /usr/local/netcdf/gfortran/bin/libtool  --mode=link gfortran
-         DEBFLGS  = 
-         OPT      = -O3 -g
+#        CPPFLAGS = $(DEF_FLAGS)
+#         CPP      = /usr/bin/cpp
+#         FC       = ifort #-funderscoring # -fno-second-underscore
+#         FLINK    = ifort ##/bin/sh /usr/local/netcdf/gfortran/bin/libtool  --mode=link gfortran
+#         DEBFLGS  = 
+#         OPT      = -O3 -g
