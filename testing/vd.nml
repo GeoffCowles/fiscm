@@ -1,0 +1,66 @@
+// vertical diffusion test
+
+&NML_FISCM
+ beg_time_days   = 0., 
+ end_time_days   = 1.0,
+ deltaT          = 240,
+ ireport         = 1,
+ ngroups         = 1,
+ nfiles_in       = 1,
+ forcing_file    = './fake_forcing.nc'
+ spherical       = 0,
+ sz_cor          = 0,
+ fix_dep         = 0,
+ dvm_bio         = 0,
+ wind_type       = 0,
+ dvmh_up         = 15.0,
+ dvmh_dn         = 1.0
+/
+
+&NML_NCVAR
+          x_char  ='x',
+          y_char  ='y',
+          h_char  ='h',
+         nv_char  ='nv',
+       nele_char  ='nele',
+       node_char  ='node',
+        nbe_char  ='nbe',
+        aw0_char  ='aw0',
+        awx_char  ='awx',
+        awy_char  ='awy',
+        a1u_char  ='a1u',
+        a2u_char  ='a2u',
+     siglay_char  ='siglay',
+     siglev_char  ='siglev',
+         ua_char  ='ua',
+         va_char  ='va',
+       zeta_char  ='zeta',
+          h_char  ='h',
+         wu_char  ='windu',
+         wv_char  ='windv',
+          u_char  ='u',
+          v_char  ='v',
+      omega_char  ='ww',
+         kh_char  ='kh',
+    viscofm_char  ='viscofm'
+/
+
+
+
+ &NML_GROUP
+ init_pos_file    = 'vd_init.dat',  
+ space_dim        = 3,
+ group_name       = 'vertdiff', 
+ hdiff_type       = 0,
+ hdiff_const_val  = 0.,
+ vdiff_type       = 1,
+ vdiff_const_val  = 0.0,
+ vdiff_substeps   = 100
+ intvl_bio        = 180,
+ biology          = T,
+ intvl_out        = 1,
+ start_out        = 0.0,
+ nstate           = 0,
+ statefile        = 'cpp.nml',
+ paramfile        = 'cfin.nml'
+/
