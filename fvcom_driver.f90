@@ -653,7 +653,7 @@ subroutine rw_vdiff(g, dT, nstep)
   real(sp), allocatable :: dkh_ds(:)
   real(sp), allocatable :: zeta(:)
   real(sp), allocatable :: s_shift(:)
-  real(sp), parameter :: delta_s = 0.05
+  real(sp), parameter :: delta_s = 0.001
   real(sp) :: deltaT,fac,randy,dz,depth,dkh_dz,vsink
   integer  :: n,p,np
 
@@ -718,6 +718,7 @@ subroutine rw_vdiff(g, dT, nstep)
       depth  = h(p)+zeta(p)
       dkh_dz = dkh_ds(p)/depth
       dz     = dkh_dz*deltaT + normal(-deltaT*vsink*depth,1.0d0)*sqrt(fac*kh(p)) !Visser-modified
+!      dz     = dkh_dz*deltaT + unitrand()*sqrt(fac*kh(p)) !Visser-modified
 !      dz     = 2*unitrand()*sqrt(2.*3*kh(p)*deltaT)  !naive unitrand
 !      dz     = normal(-deltaT*.001*depth,1.d0)*sqrt(2.*kh(p)*deltaT)                 !naive normal
       s(p)   = s(p) + dz/depth
