@@ -9,6 +9,7 @@
 ! gfortran -c make_fake_forcing.f90 -I/usr/local/netcdf/gfortran/include ; /bin/sh /usr/local/netcdf/gfortran/bin/libtool  --mode=link gfortran make_fake_forcing.o -o make_fake_forcing -L/usr/local/netcdf/gfortran/lib -lnetcdf
 !
 ! gfortran -c make_fake_forcing.f90 -I/opt/netcdf3/gfortran/include ; gfortran  make_fake_forcing.o -o make_fake_forcing -L/opt/netcdf3/gfortran/lib  -lnetcdf
+! /usr/local/bin/gfortran -c make_fake_forcing.f90 -I/opt/netcdf3/gnu32/include; /usr/local/bin/gfortran -o make_fake_forcing make_fake_forcing.o -L/opt/netcdf3/gnu32/lib -lnetcdf
 !
 ! !REVISION HISTORY:                   
 !  Original author(s): G. Cowles 
@@ -62,10 +63,11 @@ Program make_fake_forcing
   !------------------------------------------------------------------------------
   ! set case type 
   !  1.) oscillating solid body rotation with increasing temp
-  !  2.) still flow with constant, reasonable kh profile, non-constant sigma
-  !  3.) still flow with constant, reasonable kh profile, constant sigma spacing
+  !  2.) still flow with steady, reasonable kh profile, non-constant sigma
+  !  3.) still flow with steady, reasonable kh profile, constant sigma spacing
+  !  4.) still flow with constant in times/space kh profile, constant sigma 
   !------------------------------------------------------------------------------
-  case_type = 1
+  case_type = 3
 
   if(case_type == 1)then
     N_levels = 5
@@ -89,6 +91,17 @@ Program make_fake_forcing
     allocate(khobs(N_levels))
     allocate(zobs(N_levels))
     open(unit=33,file='kh_data2.dat',form='formatted')
+    do i=1,N_levels
+      read(33,*)zobs(i),khobs(i)
+    end do
+    close(33)
+  elseif(case_type ==4)then
+    N_levels = 81
+    N_layers = N_levels-1
+    bathy    = 40.
+    allocate(khobs(N_levels))
+    allocate(zobs(N_levels))
+    open(unit=33,file='kh_data3.dat',form='formatted')
     do i=1,N_levels
       read(33,*)zobs(i),khobs(i)
     end do
@@ -170,7 +183,7 @@ Program make_fake_forcing
     do k=1,N_layers+1
       if(case_type == 1)then
         siglev(i,k) = -float(k-1)/float(N_layers-1) 
-      elseif(case_type ==2 .or. case_type==3)then
+      elseif(case_type ==2 .or. case_type==3 .or. case_type==4)then
         siglev(i,k) = -zobs(k)/bathy
       endif
     end do
@@ -270,7 +283,7 @@ Program make_fake_forcing
   call cfcheck( nf90_put_att(ofid, v_vid,"type","data") )
 
   !omega
-  call cfcheck( nf90_def_var(ofid,"omega",nf90_float,(/node_did,siglev_did,time_did/), omega_vid) )
+  call cfcheck( nf90_def_var(ofid,"ww",nf90_float,(/node_did,siglev_did,time_did/), omega_vid) )
   call cfcheck( nf90_put_att(ofid, omega_vid,"long_name","Vertical Sigma Coordinate Velocity") )
   call cfcheck( nf90_put_att(ofid, omega_vid,"units","s-1") )
   call cfcheck( nf90_put_att(ofid, omega_vid,"grid","fvcom_grid") )
@@ -331,7 +344,7 @@ Program make_fake_forcing
       t(i,:) = 4.*sqrt(  x(i)**2 + y(i)**2 )/sqrt(xmax**2 + ymax**2) + 12.
       kh(i,:) = 0.0
     end do
-  elseif(case_type == 2 .or. case_type ==3)then
+  elseif(case_type == 2 .or. case_type ==3 .or. case_type == 4)then
     do i=1,N_verts
     do k=1,N_levels
       kh(i,k) = khobs(k)

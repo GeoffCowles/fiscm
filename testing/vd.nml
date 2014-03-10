@@ -2,7 +2,7 @@
 
 &NML_FISCM
  beg_time_days   = 0., 
- end_time_days   = 1.0,
+ end_time_days   = 2.0,
  deltaT          = 240,
  ireport         = 1,
  ngroups         = 1,
@@ -55,7 +55,8 @@
  hdiff_const_val  = 0.,
  vdiff_type       = 1,
  vdiff_const_val  = 0.0,
- vdiff_substeps   = 100
+ vdiff_substeps   = 20 
+ vsink            = 0.0000,
  intvl_bio        = 180,
  biology          = T,
  intvl_out        = 1,

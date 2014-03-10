@@ -27,6 +27,7 @@ integer  :: intvl_bio
 real(sp) :: tlast_out,start_out
 real(sp) :: group_deltat
 real(sp) :: hdiff_const_val,vdiff_const_val
+real(sp) :: vsink = 0.0_sp
 logical  :: biology
 character(len=fstr) :: init_pos_file,group_name,fname_out
 character(len=fstr) :: statefile,paramfile
@@ -40,6 +41,7 @@ Namelist /NML_GROUP/     &
    & vdiff_type,         &
    & vdiff_const_val,    &
    & vdiff_substeps,     &
+   & vsink,              & 
    & intvl_bio,          &
    & biology,            &
    & intvl_out,          &
@@ -79,6 +81,7 @@ type igroup
   integer             :: vdiff_type
   real(sp)            :: vdiff_const_val
   integer             :: vdiff_substeps
+  real(sp)            :: vsink
   integer             :: intvl_bio                  
   real(sp)            :: DT_bio
   logical             :: biology
@@ -170,6 +173,7 @@ function group_(fid,id,deltaT,output_prefix) result(g)
   g%vdiff_type = vdiff_type
   g%vdiff_const_val = vdiff_const_val
   g%vdiff_substeps  = vdiff_substeps
+  g%vsink     = vsink
   g%intvl_bio = intvl_bio
   g%biology = biology
   g%intvl_out = intvl_out

@@ -8,6 +8,7 @@ kh = squeeze(netcdf.getVar(ncid,12,[1,0,1],[1,81,1]));
 nlay = numel(kh);
 depth = 40;
 z = 0:-(40-0)/(nlay-1):-40;
+subplot(1,2,1)
 plot(kh,z);
 xlabel('kh');
 ylabel('z');
@@ -18,7 +19,7 @@ delay = .2;
 
 
 % open the particle data
-figure
+subplot(1,2,2)
 ncid = netcdf.open(fname);
 [numdims,numvars,numglobalatts,unlimdimid] = netcdf.inq(ncid);
 
@@ -36,12 +37,12 @@ hp = netcdf.getVar(ncid,3);
 %plot(xp(1,:),yp(1,:),'ro','MarkerFaceColor','r','EraseMode','none');
 %plothandle = plot(xp(1),yp(1),'bo','MarkerFaceColor','b','EraseMode','xor');
 %figure(fighandle)
-prob = zeros(41,ntimes); 
+prob = zeros(40,ntimes); 
 for n=1:ntimes
   [nbin] = histc(abs(zp(:,n)),0:1:40);
 %  tt = ceil(abs(zp(:,n))+1e-9);     
 %  [nbin,x] = hist(abs(zp(:,n)),40);
-  prob(41:-1:1,n) = 41*nbin/nlag; 
+  prob(40:-1:1,n) = 40*nbin(1:end-1)/nlag; 
 %  plot(n*ones(nlag,1),zp(:,n),'k+'); hold on;
 %  axis([1,ntimes,-100,2])
 % set(plothandle,'XData',xp(n,:),'YData',yp(n,:))

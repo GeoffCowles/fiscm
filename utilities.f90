@@ -258,15 +258,14 @@ function gettime(insecs) result(instring)
   ! return random number from normal distribution 
   ! with mean = 0.0 and dev = 1. 
   !-----------------------------------------------
-  function normal_zeromean() result(normal)
+  function normal_zeromean() result(mynormal)
     implicit none 
     real(sp) :: r1,r2
-    real(sp) :: normal
-    real(sp),parameter :: PI = 3.14159265358979
-
+    real(sp) :: mynormal
+    real(sp),parameter :: PI = 3.14159265358979d0
     r1 = ran1()
     r2 = ran1()
-    normal = sqrt(DBLE(-2.)*log(r1)) * cos(DBLE(2.)*PI*r2)
+    mynormal = sqrt(DBLE(-2.)*log(r1)) * cos(DBLE(2.)*PI*r2)
 
     return 
   end function normal_zeromean

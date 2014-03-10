@@ -252,9 +252,14 @@ subroutine ocean_model_init(ng,g,lsize,varlist)
   msg = "error reading nv coordinate"
   call ncdchk( nf90_inq_varid(fid,nv_char,varid),msg )
   call ncdchk(nf90_get_var(fid, varid, tri),msg)
-      msg = "error reading nbe"
-  call ncdchk( nf90_inq_varid(fid,nbe_char,varid),msg )
-  call ncdchk(nf90_get_var(fid, varid, nbe),msg)
+  if(ncdscan( nf90_inq_varid(fid,nbe_char,varid),msg ) )then
+    msg = "error reading nbe"
+    call ncdchk( nf90_inq_varid(fid,nbe_char,varid),msg )
+    call ncdchk(nf90_get_var(fid, varid, nbe),msg)
+  else
+    write(*,*)'WARNING:::::: NBE is not in the forcing file' 
+    write(*,*)'will try to compute internally'
+  endif
   msg = "error reading aw0"
   !read aw0 if they exist, otherwise use 1st order interpolation
   if(ncdscan( nf90_inq_varid(fid,aw0_char,varid),msg ) )then
@@ -630,7 +635,7 @@ end subroutine rw_hdiff_variable
 !   - use Vissers modified random walk to compute jump
 !----------------------------------------------------
 subroutine rw_vdiff(g, dT, nstep)
-  use utilities, only : normal
+  use utilities, only : normal,unitrand,ran1
   type(igroup), intent(inout) :: g
   real(sp), intent(in) :: dT
   integer,  intent(in) :: nstep
@@ -649,10 +654,11 @@ subroutine rw_vdiff(g, dT, nstep)
   real(sp), allocatable :: zeta(:)
   real(sp), allocatable :: s_shift(:)
   real(sp), parameter :: delta_s = 0.05
-  real(sp) :: deltaT,fac,randy,dz,depth,dkh_dz
+  real(sp) :: deltaT,fac,randy,dz,depth,dkh_dz,vsink
   integer  :: n,p,np
 
   !set problem size and time step
+  vsink = g%vsink
   np = g%nind
   deltaT = dT/float(nstep)
 
@@ -701,15 +707,20 @@ subroutine rw_vdiff(g, dT, nstep)
     call interp(np,x,y,s_shift,cell,istatus,kh_char,kh,3)
 
     ! => main loop over particles
+!gwc    do p=1,1000
+!gwc      write(33,*)normal(),ran1()
+!gwc    end do
+!gwc    stop
     do p=1,np
       if(istatus(p) < 1)cycle
 
       !update particle position using Visser modified random walk 
       depth  = h(p)+zeta(p)
       dkh_dz = dkh_ds(p)/depth
-      dz     = dkh_dz*deltaT + normal()*sqrt(fac*kh(p)) !Visser-modified
+      dz     = dkh_dz*deltaT + normal(-deltaT*vsink*depth,1.0d0)*sqrt(fac*kh(p)) !Visser-modified
+!      dz     = 2*unitrand()*sqrt(2.*3*kh(p)*deltaT)  !naive unitrand
+!      dz     = normal(-deltaT*.001*depth,1.d0)*sqrt(2.*kh(p)*deltaT)                 !naive normal
       s(p)   = s(p) + dz/depth
-!      dz     = unitrand()*sqrt(2.*kh(p))                 !naive
 
       !set boundary conditions at free surface and bottom
       s(p) = max(s(p),-(2.0+s(p))) !reflect off bottom
@@ -1057,6 +1068,7 @@ subroutine advect3D(g,deltaT,np,time)
    chix(:,ns)  = u(:)
    chiy(:,ns)  = v(:)
    chiz(:,ns)  = w(:)/(h(:)+zeta(:))  !delta_sigma/deltaT = ww/D
+!   chiz(:,ns) = chiz(:,ns) - .005 !!gwc try sinking - this is CFL-constrained
      !!Limit vertical motion in very shallow water
      where( (h + zeta) < eps)
         chiz(:,ns) = 0.0_sp
@@ -1108,9 +1120,12 @@ end do
       istatus=ACTIVE
     end where
   zn = s*(h + zeta) + zeta  
-  s(:)  = pdzt(:)
+  s(:)  = pdzt(:) 
+!  s(:)  = s(:) - .05*deltaT/(h + zeta) !try constant dz sink
   !--Adjust Depth of Updated Particle Positions----------------------------------!
-  s = max(s,-(2.0+s))                 !Reflect off Bottom
+!  s = max(s,-(2.0+s))                 !Reflect off Bottom
+  s = max(s,-1.0)                       !Do Not Pierce Bottom  
+!  s = -1.0 !gwc  
   s = min(s,0.0_sp)                      !Don t Pierce Free Surface
 
   !--Evaluate Bathymetry and Free Surface Height at Updated Particle Position----!
