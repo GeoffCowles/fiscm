@@ -474,15 +474,25 @@ subroutine rw_hdiff_constant(g, dT)
 
   !horizontal random walk
      if(spherical == 0 )then
-      where(istatus == ACTIVE)
-       pdxt = x + normal()*tscale
-       pdyt = y + normal()*tscale
-      end where
+       do p=1,np
+         if(istatus(p)==ACTIVE)then
+           pdxt(p) = x(p) + normal()*tscale
+           pdyt(p) = y(p) + normal()*tscale
+         else
+           pdxt(p) = x(p)
+           pdyt(p) = y(p)
+         endif
+       end do
      elseif (spherical == 1)then
-      where(istatus == ACTIVE)
-       pdxt = x  + normal()*tscale/(tpi*COS(y) + 1.0E-6)
-       pdyt = y  + normal()*tscale/tpi
-      end where
+       do p=1,np
+         if(istatus(p)==ACTIVE)then
+           pdxt(p) = x(p)  + normal()*tscale/(tpi*COS(y(p)) + 1.0E-6)
+           pdyt(p) = y(p)  + normal()*tscale/tpi
+         else
+           pdxt(p) = x(p)
+           pdyt(p) = y(p)
+         endif
+       end do
 
       where( pdxt < 0.0_SP)
       pdxt = pdxt + 360.0_SP
@@ -497,7 +507,7 @@ subroutine rw_hdiff_constant(g, dT)
       where( pdyt < -90.0_SP)
       pdyt =  - 180.0_SP - pdyt
       end where
-     endif
+     endif !spherical
 
 
      
