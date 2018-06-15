@@ -1,32 +1,71 @@
 &NML_FISCM
- beg_time_days   = 1.0,
- end_time_days   = 10.,     
- deltaT          = 20.,
- ireport         = 180,
+ beg_time_days   = 48438, 
+ end_time_days   = 48453,    
+ deltaT          = 480,         !advection timestep
+ ireport         = 30,
  ngroups         = 1,
- forcing_file    = 'gom1_0001.nc'
+ nfiles_in       = 1,
+ forcing_file    = '/Volumes/4TB_A/Buzzards_Bay/Hindcasts/GoM3-2Lay/gom_2lay_071991.nc'
+ output_prefix   = './test'
+ spherical       = 0,
+ sz_cor          = 0,           ! 0 - initial depth is specified in s ;1 - initial depth is specified in z
+ fix_dep         = 0,           ! 1 - fix depth (if sz_cor=0 sigma is fixed; if sz_cor=1 depth below surface is fixed)
+ dvm_bio         = 0,
+ wind_type       = 0,
+ dvmh_up         = 6.0,
+ dvmh_dn         = 1.0
+/
+
+&NML_NCVAR
+          x_char  ='x',
+          y_char  ='y',
+          h_char  ='h',
+         nv_char  ='nv',
+       nele_char  ='nele',
+       node_char  ='node',
+        nbe_char  ='nbe',
+        aw0_char  ='aw0',
+        awx_char  ='awx',
+        awy_char  ='awy',
+        a1u_char  ='a1u',
+        a2u_char  ='a2u',
+        art_char  ='art1',
+     siglay_char  ='siglay',
+     siglev_char  ='siglev',
+         ua_char  ='ua',
+         va_char  ='va',
+       zeta_char  ='zeta',
+        wu_char  ='windu',
+         wv_char  ='windv',
+          u_char  ='u',
+          v_char  ='v',
+      omega_char  ='omega',
+         kh_char  ='u'
+     viscofm_char = 'u'
 /
 
 
- &NML_GROUP
- Tnind            = 3,
+&NML_GROUP
+ init_pos_file    = './test.dat'
  space_dim        = 3,
- group_name       = 'Lobster', 
- hdiff_type       = 0,
- hdiff_const_val  = 10.,
+ group_name       = 'nomans_may', 
+ hdiff_type       = 3,
+ hdiff_const_val  = 1,
  vdiff_type       = 0,
  vdiff_const_val  = 0.0,
- vdiff_substeps   = 5
- intvl_bio        = 180,
+ vdiff_substeps   = 10,
+ intvl_bio        = 1,
  biology          = T,
- intvl_out        = 180,
+ intvl_out        = 30, 
  start_out        = 0.0,
  nstate           = 5,
- statefile        = 'lobster.nml',
- paramfile        = 'lobster.nml'
+ statefile        = 'lobster_spawn.nml',
+ paramfile        = 'lobster_spawn.nml', 
 /
 
- &NML_STATEVAR
+
+
+&NML_STATEVAR
  state_varname          = 'stage',
  state_longname         = 'stage',
  state_units            = '-',
@@ -35,6 +74,7 @@
  state_initval_int      = 1,
  state_initval_flt      = 0.0,
  state_from_ext_var     = 'NONE'
+ state_ext_var_dim      = 0
 /
 
  &NML_STATEVAR
@@ -46,6 +86,7 @@
  state_initval_int      = 1,
  state_initval_flt      = 0.0,
  state_from_ext_var     = 'NONE'
+ state_ext_var_dim      = 0
 /
  &NML_STATEVAR
  state_varname          = 'T',
@@ -56,17 +97,22 @@
  state_initval_int      = 1,
  state_initval_flt      = 12.0,
  state_from_ext_var     = 'temp'
+ state_ext_var_dim      = 3
 /
+
  &NML_STATEVAR
- state_varname          = 'KH',
- state_longname         = 'eddy diffusivity'
- state_units            = 'm^2/s',
+ state_varname          = 'bT',
+ state_longname         = 'bottom_temperature',
+ state_units            = 'C',
  state_netcdf_out       = 1,
- state_vartype          = 1,
- state_initval_int      = 0,
- state_initval_flt      = 0.0,
- state_from_ext_var     = 'none'
+ state_vartype          = 2,
+ state_initval_int      = 1,
+ state_initval_flt      = 12.0,
+ state_from_ext_var     = 'btemp'
+ state_ext_var_dim      = 2
 /
+
+
  &NML_STATEVAR
  state_varname          = 'N',
  state_longname         = 'number of individuals',
@@ -76,10 +122,11 @@
  state_initval_int      = 50000,
  state_initval_flt      = 0.0,
  state_from_ext_var     = 'NONE'
+ state_ext_var_dim      = 0
 /
 
  &NML_LOBSTER
  fcomp_settle           = 0.5,
- SCF                    = 0.4
+ SCF                    = 1.0
 /
 
