@@ -59,8 +59,8 @@
  intvl_out        = 30, 
  start_out        = 0.0,
  nstate           = 5,
- statefile        = 'lobster_spawn.nml',
- paramfile        = 'lobster_spawn.nml', 
+ statefile        = 'lobster.nml',
+ paramfile        = 'lobster.nml', 
 /
 
 
