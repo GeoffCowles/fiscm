@@ -140,12 +140,13 @@ Program fiscm
     call activate(ngroups,igroups,t,sim_direction)
     call interp_forcing(ngroups,igroups,3) 
     call cdf_out(ngroups,igroups,its,t,NCDO_OUTPUT)
-    call do_bio(ngroups,igroups,t,its)
+    call do_bio(ngroups,igroups,t,1)
     !---------------------------------------------------------
     !call exchange_forcing
     endif
   do its=1,nits
     t = t + deltaT*sec_2_day
+    !t = aint( t * 10000.0) / 10000.0 
 
     !  write(*,'(I10,F10.2)')its,t
     !---------------------------------------------------------

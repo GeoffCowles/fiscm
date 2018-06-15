@@ -690,6 +690,16 @@ subroutine bracket(t,i1,i2)
     stop
   endif
 
+  if(t > ftimes(nframes))then
+    write(*,*)'error in bracket'
+    write(*,*)'model time is not in the range of the netcdf dataset'
+    write(*,*)'model time       : ',gettime(int(t))
+    write(*,*)'netcdf begin time: ',gettime(int(ftimes(1)))
+    write(*,*)'netcdf end   time: ',gettime(int(ftimes(nframes)))
+    write(*,*)'GWC',t,ftimes(nframes)
+    stop
+  endif
+
   do i=1,nframes-1
     if(ftimes(i) <= t .and. t <= ftimes(i+1))then
       i1 = i

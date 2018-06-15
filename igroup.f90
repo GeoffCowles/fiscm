@@ -58,6 +58,7 @@ integer             :: state_vartype
 integer             :: state_initval_int
 real(sp)            :: state_initval_flt
 character(len=fstr) :: state_from_ext_var
+integer             :: state_ext_var_dim
 
 Namelist /NML_STATEVAR/   &
    & state_varname,             &
@@ -67,7 +68,8 @@ Namelist /NML_STATEVAR/   &
    & state_vartype,             &
    & state_initval_int,         &
    & state_initval_flt,         &
-   & state_from_ext_var
+   & state_from_ext_var,        &
+   & state_ext_var_dim
 
 !Group type
 type igroup 
@@ -98,6 +100,7 @@ type igroup
   integer             :: nstate
   integer             :: next
   character(len=fstr) :: ext_var(max_state_vars,2)
+  integer             :: ext_var_dim(max_state_vars)
   integer             :: nstate_ud
 end type igroup 
 
@@ -187,6 +190,7 @@ function group_(fid,id,deltaT,output_prefix) result(g)
   g%statefile = statefile
   g%paramfile = paramfile
   g%state = pvar_list_() 
+  g%ext_var_dim = 0
 
   !setup the output file containing group positions
   write(num,'(I1)') g%id
@@ -253,10 +257,10 @@ subroutine group_addstates(g)
     endif
     if(state_vartype == itype)then
       call add_state(g,trim(state_varname),trim(state_longname),trim(state_units), &
-                   state_netcdf_out,state_initval_int,trim(state_from_ext_var))
+                   state_netcdf_out,state_initval_int,trim(state_from_ext_var),state_ext_var_dim)
     else if(state_vartype == ftype)then
         call add_state(g,trim(state_varname),trim(state_longname),trim(state_units), &
-                   state_netcdf_out,state_initval_flt,trim(state_from_ext_var))
+                   state_netcdf_out,state_initval_flt,trim(state_from_ext_var),state_ext_var_dim)
     else
       write(*,*)'fatal error: not setup for variable type ',state_vartype,' in group_'
       stop
@@ -267,7 +271,7 @@ subroutine group_addstates(g)
 
 end subroutine group_addstates
 
-subroutine add_state_fvec(g,varname,longname,units,output,init_val,ext_name)
+subroutine add_state_fvec(g,varname,longname,units,output,init_val,ext_name,ext_var_dim)
    type(igroup)        :: g 
    character(len=*)    :: varname
    character(len=*)    :: longname
@@ -275,6 +279,7 @@ subroutine add_state_fvec(g,varname,longname,units,output,init_val,ext_name)
    integer             :: output
    real(sp)            :: init_val
    character(len=*), optional :: ext_name
+   integer, optional   :: ext_var_dim
 
    type(pvar)          :: new
    integer             :: i
@@ -305,6 +310,7 @@ subroutine add_state_fvec(g,varname,longname,units,output,init_val,ext_name)
        g%next = g%next + 1
        g%ext_var(g%next,1) = trim(varname)
        g%ext_var(g%next,2) = trim(ext_name)
+       g%ext_var_dim(g%next) = ext_var_dim
      endif
    else
      new%from_ext_var = "NONE"
@@ -314,7 +320,7 @@ subroutine add_state_fvec(g,varname,longname,units,output,init_val,ext_name)
    g%nstate = g%nstate + 1;
 end subroutine add_state_fvec
 
-subroutine add_state_ivec(g,varname,longname,units,output,init_val,ext_name)
+subroutine add_state_ivec(g,varname,longname,units,output,init_val,ext_name,ext_var_dim)
    type(igroup)        :: g 
    character(len=*)    :: varname
    character(len=*)    :: longname
@@ -322,6 +328,7 @@ subroutine add_state_ivec(g,varname,longname,units,output,init_val,ext_name)
    integer             :: output
    integer             :: init_val
    character(len=*), optional :: ext_name
+   integer, optional   :: ext_var_dim
    type(pvar)          :: new
    integer             :: i
 
@@ -353,6 +360,7 @@ subroutine add_state_ivec(g,varname,longname,units,output,init_val,ext_name)
        g%next = g%next + 1
        g%ext_var(g%next,1) = trim(varname)
        g%ext_var(g%next,2) = trim(ext_name)
+       g%ext_var_dim(g%next) = ext_var_dim
        write(*,*)'ADDING EXT VAR: ',trim(ext_name),'  to : ',trim(varname)
      endif
    else
@@ -544,11 +552,13 @@ function checkstatus(ng,g,time) result(validsim)
    write(*,103)time,nTOTAL,nSETTLED,nDEAD,nACTIVE,nEXITED,nUNKNOWN
 
 
-   if(nACTIVE + nUNKNOWN == 0)then
-      validsim = .false.
-      call drawline('-')
-      write(*,*)'no active particles left in the simulation: shutting down early'
-   endif
+! run simulation to completion, will be easier to compare sims if they are all
+! the same duration
+!gwc   if(nACTIVE + nUNKNOWN == 0)then
+!gwc      validsim = .false.
+!gwc      call drawline('-')
+!gwc      write(*,*)'no active particles left in the simulation: shutting down early'
+!gwc   endif
 
   
  101 format(A13,1X,I8,1X,I8,1X,I8,1X,I8,1X,I8,1X,I8) 

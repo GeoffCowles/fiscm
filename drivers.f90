@@ -62,12 +62,14 @@ subroutine do_adv_diff(ng,g,dT,time)
       call advect2D( g(n) , dT,g(n)%nind)
       if(g(n)%hdiff_type == HDIFF_CONSTANT) call rw_hdiff_constant( g(n) ,dT) 
       if(g(n)%hdiff_type == HDIFF_VARIABLE) call rw_hdiff_variable( g(n),dT)
+      if(g(n)%hdiff_type == HDIFF_OKUBO)    call rw_hdiff_okubo( g(n),dT)
     !--------------------------------------------------------------------
     case(3) ! 3D Problem
     !--------------------------------------------------------------------
       call advect3D( g(n) ,dT ,g(n)%nind,time)
       if(g(n)%hdiff_type == HDIFF_CONSTANT) call rw_hdiff_constant( g(n) ,dT) 
       if(g(n)%hdiff_type == HDIFF_VARIABLE) call rw_hdiff_variable( g(n),dT)
+      if(g(n)%hdiff_type == HDIFF_OKUBO)    call rw_hdiff_okubo( g(n),dT)
       if(g(n)%vdiff_type == VDIFF_VARIABLE) call rw_vdiff(g(n), dT, g(n)%vdiff_substeps)  
       if(g(n)%vdiff_type == VDIFF_SPLINED ) call rw_vdiff_splined(g(n), dT, g(n)%vdiff_substeps)  
       if(g(n)%vdiff_type == VDIFF_BINNED  ) call rw_vdiff_binned(g(n), dT, g(n)%vdiff_substeps)  
@@ -115,7 +117,7 @@ subroutine interp_forcing(ng,g,iframe)
   real(sp), pointer :: f(:)
   real(sp), pointer :: i(:)
 
-  integer :: n,vtype,v
+  integer :: n,vtype,v,vdim
   character(len=fstr) :: evar,svar
 
   
@@ -140,8 +142,8 @@ subroutine interp_forcing(ng,g,iframe)
       !get varname and type
       svar  = g(n)%ext_var(v,1)
       evar  = g(n)%ext_var(v,2)
+      vdim  = g(n)%ext_var_dim(v)
       vtype = 1 !istype(g(n),svar) gwc debug
-
       !get pointer to var
       if(vtype == flt_type)then
         call get_state(svar,g(n),f) 
@@ -155,7 +157,8 @@ subroutine interp_forcing(ng,g,iframe)
    
       !interpolate - 2D
       !interp in fvcom_drivers.f90
-      if(g(n)%space_dim == 2)then
+!      if(g(n)%space_dim == 2)then
+       if(vdim == 2)then 
         if(vtype == flt_type)then
           call interp(g(n)%nind,x,y,cell,istatus,evar,f,iframe)
         elseif(vtype == int_type)then
@@ -207,6 +210,7 @@ subroutine update_element(ng,g)
     call get_state('status',g(n),istatus)
     !update element containing cell 
     call find_element(np,x(1:np),y(1:np),cell(1:np),istatus(1:np))
+
   end do
 nullify(x)
 nullify(y)

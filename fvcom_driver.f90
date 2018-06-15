@@ -75,11 +75,12 @@ real(sp), pointer :: esiglay(:,:)
 real(sp), pointer :: esiglev(:,:)
 
 !added by Xinyou
+real(sp), pointer :: art(:)
 real(sp), pointer :: a1u(:,:)
 real(sp), pointer :: a2u(:,:)
 character(len=10)  :: x_char,y_char,h_char,u_char,v_char, &
   kh_char,viscofm_char,ua_char,va_char,nv_char,nbe_char,aw0_char,awx_char,awy_char,a1u_char, &
-  a2u_char,nele_char,node_char,zeta_char,omega_char,         &
+  a2u_char,art_char,nele_char,node_char,zeta_char,omega_char,         &
   siglay_char,siglev_char,wu_char,wv_char
   Namelist /NML_NCVAR/  &
            x_char,   &
@@ -94,6 +95,7 @@ character(len=10)  :: x_char,y_char,h_char,u_char,v_char, &
          awy_char,   &
          a1u_char,   &
          a2u_char,   &
+         art_char,   &
       siglay_char,   &
       siglev_char,   &
           ua_char,   &
@@ -224,6 +226,7 @@ subroutine ocean_model_init(ng,g,lsize,varlist)
 
   allocate(a2u(N_elems,4)) ;a2u   = zero
   allocate(a1u(N_elems,4)) ;a1u   = zero
+  allocate(art(N_verts))   ;art   = zero
 
   !----------------Node, Boundary Condition, and Control Volume-----------------------!
 
@@ -260,6 +263,7 @@ subroutine ocean_model_init(ng,g,lsize,varlist)
     write(*,*)'WARNING:::::: NBE is not in the forcing file' 
     write(*,*)'will try to compute internally'
   endif
+
   msg = "error reading aw0"
   !read aw0 if they exist, otherwise use 1st order interpolation
   if(ncdscan( nf90_inq_varid(fid,aw0_char,varid),msg ) )then
@@ -283,6 +287,16 @@ subroutine ocean_model_init(ng,g,lsize,varlist)
     write(*,*)'AW0 = 1/3; AWX=AWY = 0'
     write(*,*)'In the future, select [grid metrics] in your NetCDF namelist'
   endif
+
+  msg = "error reading art1"
+  if(ncdscan( nf90_inq_varid(fid,art_char,varid),msg ) )then
+    call ncdchk(nf90_get_var(fid, varid, art),msg)
+    msg = "error reading art1"
+  else
+    write(*,*)'Error reading art1 => needed for Okubo horizontal diffusivity'
+    write(*,*)'In the future, select [grid metrics] in your NetCDF namelist'
+  endif
+
   msg = "error reading siglay"
   call ncdchk( nf90_inq_varid(fid,siglay_char,varid),msg )
   call ncdchk(nf90_get_var(fid, varid, siglay),msg)
@@ -291,27 +305,27 @@ subroutine ocean_model_init(ng,g,lsize,varlist)
   call ncdchk(nf90_get_var(fid, varid, siglev),msg)
 
   !read secondary connectivity (nbve/ntve) 
-  !grid_metrics = .false.
-  !msg = "dimension 'maxelem' not in the netcdf dataset"
-  !if(ncdscan( nf90_inq_dimid(fid,'maxelem',dimid),msg ) )then
-  !  call ncdchk(nf90_inquire_dimension(fid, dimid, dname, Max_Elems))
-  !  allocate(ntve(N_verts))
-  !  allocate(nbve(N_verts,Max_Elems))
-  !  msg = "error reading ntve"
-  !  call ncdchk( nf90_inq_varid(fid,'ntve',varid),msg )
-  !  call ncdchk(nf90_get_var(fid, varid, ntve),msg)
-  !  msg = "error reading nbve"
-  !  call ncdchk( nf90_inq_varid(fid,'nbve',varid),msg )
-  !  call ncdchk(nf90_get_var(fid, varid, nbve),msg)
-  !  grid_metrics = .true.
-  !else 
+  grid_metrics = .false.
+  msg = "dimension 'maxelem' not in the netcdf dataset"
+  if(ncdscan( nf90_inq_dimid(fid,'maxelem',dimid),msg ) )then
+    call ncdchk(nf90_inquire_dimension(fid, dimid, dname, Max_Elems))
+    allocate(ntve(N_verts))
+    allocate(nbve(N_verts,Max_Elems))
+    msg = "error reading ntve"
+    call ncdchk( nf90_inq_varid(fid,'ntve',varid),msg )
+    call ncdchk(nf90_get_var(fid, varid, ntve),msg)
+    msg = "error reading nbve"
+    call ncdchk( nf90_inq_varid(fid,'nbve',varid),msg )
+    call ncdchk(nf90_get_var(fid, varid, nbve),msg)
+    grid_metrics = .true.
+  else 
 ! Revised by Xinyou Lin  in Jan ,2009
 !    write(*,*)'WARNING:::::: NTVE/NBVE Do NOT exist in forcing file'
 !    write(*,*)'This will slow down the element search procedure'
 !    write(*,*)'Proceeding with: 1st Order interpolation' 
 !    write(*,*)'In the future, select [grid metrics] in your NetCDF namelist'
 
-!  endif
+  endif
 
 
   !calculate cell center coordinates
@@ -354,9 +368,7 @@ subroutine ocean_model_init(ng,g,lsize,varlist)
   !for searching element containing point
 
   !mark boundary elements
-  write(*,*)'tri grid edge'
-  CALL TRIANGLE_GRID_EDGE
-  write(*,*)'done tge' 
+  !CALL TRIANGLE_GRID_EDGE
   grid_metrics = .true.
 
 
@@ -454,7 +466,7 @@ subroutine rw_hdiff_constant(g, dT)
   real(sp), pointer :: y(:)
   integer,  pointer :: istatus(:)
   integer,  pointer :: cell(:)
-  integer  :: i,np
+  integer  :: i,p,np
   real(sp) :: tscale
   real(sp), allocatable :: pdxt(:), pdyt(:)
   
@@ -534,12 +546,92 @@ subroutine rw_hdiff_constant(g, dT)
 
 end subroutine rw_hdiff_constant
 
+!----------------------------------------------------
+! Random-Walk horizontal diffusion with spatially
+!   variable turbulent eddy diffusivity
+!
+!  => Eddy diffusivity from Okubo based on local    
+!     grid scale in the model
+!  Okubo, 1971 Ocean Diffusion Diagrams, 
+!      Deep Sea Research, V18, 789-802.
+!      (see Equation 4 - page 797)
+!
+! Use Visser's naive random walk to compute step
+!----------------------------------------------------
+subroutine rw_hdiff_okubo(g, dT)
+  use utilities, only : normal
+  type(igroup), intent(inout) :: g
+  real(sp), intent(in) :: dT
+  !----------------------------
+  integer,  pointer :: istatus(:)
+  integer,  pointer :: cell(:)
+  real(sp), pointer :: x(:)
+  real(sp), pointer :: y(:)
+  real(sp), allocatable :: pdxt(:), pdyt(:)
+  integer  :: p,np,n1,n2,n3,icell
+  real(sp) :: l,tarea,tscale,Ah
+
+  !set problem size and time step
+  np = g%nind
+
+  !set pointers to particle positions and status
+  call get_state('status',g,istatus)
+  call get_state('cell',g,cell)
+  call get_state('x',g,x)
+  call get_state('y',g,y)
+  !allocate local data
+  allocate(pdxt(np))  ; pdxt = 0.0
+  allocate(pdyt(np))  ; pdxt = 0.0
+
+
+  ! loop over particles and compute eddy diffusivity using Okubo, 1971
+  do p=1,np
+    icell = cell(p)
+    if(istatus(p) < 1 .or. icell == 0)cycle 
+
+    n1  = tri(icell,1)
+    n2  = tri(icell,2)
+    n3  = tri(icell,3)
+    tarea = aw0(icell,1)*art(n1)+aw0(icell,2)*art(n2)+aw0(icell,3)*art(n3)
+
+    l = (tarea**.5)*100  !grid lengthscale in cm
+    Ah = 0.0103*(l**1.15)/(100.*100.) !Okubo horizontal diffusivity in m^2/s 
+    tscale = sqrt(2.*dT*Ah)
+
+    !take random walk in x and y
+    pdxt(p) = x(p) + normal()*tscale
+    pdyt(p) = y(p) + normal()*tscale
+
+  end do
+
+  call find_element(np,pdxt,pdyt,cell,istatus)
+
+  !!--Update Only Particle Still in Water
+    where(istatus==ACTIVE)
+      x  = pdxt
+      y  = pdyt
+    end where
+  !!--reset position of particles which are lost from domain to last known position
+    where(istatus==EXITED)
+      istatus=ACTIVE
+    end where
+
+   !deallocate pointers
+  deallocate(pdxt)
+  deallocate(pdyt)
+  nullify(x)
+  nullify(y)
+  nullify(istatus)
+  nullify(cell)
+
+end subroutine rw_hdiff_okubo
 
 !----------------------------------------------------
 ! Random-Walk horizontal diffusion with spatially
 !   variable turbulent eddy diffusivity
 !
-! Use eddy diffusivity from the model (viscofm)
+!  => Eddy diffusivity from the model (viscofm)
+!
 ! Use Visser's naive random walk to compute step
 !----------------------------------------------------
 subroutine rw_hdiff_variable(g, dT)
@@ -552,7 +644,7 @@ subroutine rw_hdiff_variable(g, dT)
   real(sp), pointer :: x(:)
   real(sp), pointer :: y(:)
   real(sp), pointer :: s(:)
-  real(sp), allocatable :: viscofm(:), pdxt(:), pdyt(:)
+  real(sp), allocatable :: Ah(:), pdxt(:), pdyt(:)
   real(sp), allocatable :: tscale(:)
   integer  :: i,np
 
@@ -566,16 +658,16 @@ subroutine rw_hdiff_variable(g, dT)
   call get_state('y',g,y)
   call get_state('s',g,s)
   !allocate local data
-  allocate(viscofm(np))  ; viscofm   = zero 
   allocate(tscale(np))  ; tscale   = zero 
   allocate(pdxt(np))  ;
   allocate(pdyt(np))  ;
+  allocate(Ah(np))  ; Ah   = zero 
 
-    !evaluate kh at both locations
-    call interp(np,x,y,s,cell,istatus,viscofm_char,viscofm,3)
+  call interp(np,x,y,s,cell,istatus,viscofm_char,Ah,3)      
+  tscale = sqrt(2.*dT*Ah)
 
-    !update particle position using Visser modified random walk 
-     tscale = sqrt(2.*dT*viscofm)
+
+  !update particle position using Visser modified random walk 
   !horizontal random walk
      if(spherical == 0 )then
       where(istatus == ACTIVE)
@@ -621,7 +713,7 @@ subroutine rw_hdiff_variable(g, dT)
 
 
   !deallocate workspace and nullify pointers
-  deallocate(viscofm)
+  deallocate(Ah)
   deallocate(tscale)
   deallocate(pdxt)
   deallocate(pdyt)
@@ -1086,7 +1178,6 @@ subroutine advect3D(g,deltaT,np,time)
      end where
 
 end do
-
   !--Sum Stage Contributions to get Updated Particle Positions-------------------!
   pdxt(:)  = x(:)
   pdyt(:)  = y(:)
@@ -1142,7 +1233,6 @@ end do
   !--Evaluate Bathymetry and Free Surface Height at Updated Particle Position----!
   call interp(np,x,y,cell,istatus,h_char,h,3)
   call interp(np,x,y,cell,istatus,zeta_char,zeta,4)
-
   !--Sigma adjustment if fixed depth tracking------------------------------------!
   if(fix_dep == 1)then
       if(sz_cor == 1)then   ! when initial depth is specified in z
@@ -1152,7 +1242,7 @@ end do
       elseif(sz_cor == 0)then ! when initial depth is specified in s
       s  = zpini              !  WHERE ZPINI IS THE SPECIFIED FIXED SIGMA
       endif
-
+      
       s = max(s,-1.0_SP)     ! Depth can change though if particle goes into shallower areas
 
   endif
@@ -1472,21 +1562,37 @@ subroutine find_element(np,x,y,cell,istatus,option)
   integer, intent(inout) :: cell(np)
   integer, intent(inout) :: istatus(np)
   character(len=*), optional :: option
-  integer :: p
+  integer :: p,lcell
+  logical startup
+  startup = .true.  
+  if(maxval(istatus) > 0) then
+    startup = .false.
+  endif
 
   do p=1,np
     if(istatus(p) < 0)cycle
+    lcell = cell(p)
 
     !try a quick find
     cell(p) = find_element_lazy(x(p),y(p),cell(p))
     if(cell(p) /= 0)cycle
 
-    !failed, try a robust find
-    cell(p) = find_element_robust(x(p),y(p)) 
-    if(cell(p) /= 0)cycle
+    !failed, try a robust find (only on startup)
+    !we assume later that if we need robust, the particle is on
+    !land and we just reset it to last position, last cell
+    if(startup)then
+      cell(p) = find_element_robust(x(p),y(p)) 
+      if(cell(p) /= 0)cycle
+    endif
 
     !failed, update status to lost
-    istatus(p) = EXITED
+    istatus(p) = EXITED  !gwc we are assuming nobody leaves domain, speeds
+
+    !reset to last cell if we failed to find it, assume it went out of the
+    !domain
+    if(.not.startup)then
+      cell(p) = lcell
+    endif
   end do
 
 end subroutine find_element
@@ -1510,7 +1616,7 @@ function find_element_lazy(xp,yp,last) result(elem)
 
   !make sure we have a mesh  
   if(.not.mesh_setup)then
-    write(*,*)'error in find_element_robust'
+    write(*,*)'error in find_element_lazy'
     write(*,*)'mesh is not setup yet'
     stop
   endif
@@ -1550,7 +1656,7 @@ end function find_element_lazy
 !----------------------------------------------------
 ! find the element in which a point resides: robust
 !    - search outward in increasing radius
-!    - search only the closest max_check points
+!    - search only the closest max_check points (set in gparms)
 !----------------------------------------------------
 function find_element_robust(xp,yp) result(elem)
   use utilities
@@ -1563,7 +1669,6 @@ function find_element_robust(xp,yp) result(elem)
   real(sp) :: radlast
   real(sp) :: xv(3),yv(3)
   integer  :: pts(3),min_loc,locij(2),cnt
-  integer, parameter :: max_check = 15
   
   !make sure we have a mesh  
   if(.not.mesh_setup)then

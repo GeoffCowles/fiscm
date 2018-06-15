@@ -32,6 +32,7 @@ real(sp), parameter :: one   = 1.000_sp
 
 !max arrays sizes
 integer, parameter :: max_state_vars = 200
+integer, parameter :: max_check = 10 !number of neighboring cells to look for particle 
 
 !----------------------------------------------------------------
 !string length
@@ -122,6 +123,7 @@ integer, parameter :: ACTIVE = 1
 integer, parameter :: HDIFF_NONE     = 0
 integer, parameter :: HDIFF_CONSTANT = 1
 integer, parameter :: HDIFF_VARIABLE = 2     !unfinished
+integer, parameter :: HDIFF_OKUBO    = 3     
 integer, parameter :: VDIFF_NONE     = 0
 integer, parameter :: VDIFF_VARIABLE = 1
 integer, parameter :: VDIFF_SPLINED  = 2     !unfinished
