@@ -78,7 +78,7 @@ type igroup
   integer             :: nind                       !active subset
   integer             :: space_dim                  !spatial dimension of problem 0,1,2,3
   character(len=fstr) :: name                       !group name (e.g. species)
-  integer             :: hdiff_type                 !horizontal diffusion type (HDIFF_NONE,HDIFF_CONST,HDIFF_VISSER)
+  integer             :: hdiff_type                 !horizontal diffusion type (HDIFF_NONE,HDIFF_CONST,HDIFF_VARIABLE,HDIFF_OKUBO)
   real(sp)            :: hdiff_const_val            !constant value  
   integer             :: vdiff_type
   real(sp)            :: vdiff_const_val
@@ -460,6 +460,8 @@ subroutine print_group_summary(g)
        write(*,'(A21,F10.6)')'hdiff constant    :: ',g%hdiff_const_val
      case(HDIFF_VARIABLE)   
        write(*,'(A21,A20)')'hdiff type        :: ','HDIFF_VARIABLE'
+     case(HDIFF_OKUBO)   
+       write(*,'(A21,A20)')'hdiff type        :: ','HDIFF_OKUBO'
    end select
    select case(g%vdiff_type)
      case(VDIFF_NONE) 

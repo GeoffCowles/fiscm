@@ -580,8 +580,8 @@ subroutine rw_hdiff_okubo(g, dT)
   call get_state('x',g,x)
   call get_state('y',g,y)
   !allocate local data
-  allocate(pdxt(np))  ; pdxt = 0.0
-  allocate(pdyt(np))  ; pdxt = 0.0
+  allocate(pdxt(np))  ; pdxt = x   
+  allocate(pdyt(np))  ; pdyt = y   
 
 
   ! loop over particles and compute eddy diffusivity using Okubo, 1971
@@ -607,7 +607,7 @@ subroutine rw_hdiff_okubo(g, dT)
   call find_element(np,pdxt,pdyt,cell,istatus)
 
   !!--Update Only Particle Still in Water
-    where(istatus==ACTIVE)
+    where(istatus==ACTIVE) 
       x  = pdxt
       y  = pdyt
     end where
@@ -1212,7 +1212,6 @@ end do
   end do
   call find_element(np,pdxt,pdyt,cell,istatus)
   !!--Update Only Particle Still in Water
-  
     where(istatus==ACTIVE)
       x  = pdxt
       y  = pdyt
