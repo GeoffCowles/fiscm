@@ -1,7 +1,7 @@
 #          --- following for oscar/rudy ----
 	  #IOLIBS       =  -L/hosts/mao/usr/medm/install/netcdf/3.6.3/em64t/lib -lnetcdf
           #IOINCS       =  -I/hosts/mao/usr/medm/install/netcdf/3.6.3/em64t/include
-	  IOLIBS       =  -L/opt/netcdf3/gnu32/lib -lnetcdf 
+	  IOLIBS       =  -L/opt/netcdf3/gnu32/lib -lnetcdf
           IOINCS       =  -I/opt/netcdf3/gnu32/include
 
 
@@ -18,11 +18,11 @@
 #--------------------------------------------------------------------------
          CPPFLAGS = $(DEF_FLAGS)
          CPP      = /usr/bin/cpp
-         FC       = /usr/local/bin/gfortran #-funderscoring # -fno-second-underscore
+         FC       = gfortran #-funderscoring # -fno-second-underscore
 #         FLINK    = /bin/sh /usr/local/netcdf/gfortran/bin/libtool  --mode=link gfortran
-         FLINK    = /usr/local/bin/gfortran
+         FLINK    = gfortran
          DEBFLGS  = 
-         OPT      = -O1
+         OPT      = -O3
 #--------------------------------------------------------------------------
 # LINUX / ifort 
 #--------------------------------------------------------------------------
