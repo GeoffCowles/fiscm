@@ -57,7 +57,7 @@ subroutine init_bio(g,Nind_start)
   real(sp), pointer :: x(:)
   real(sp), pointer :: y(:)
   real(sp), pointer :: s(:)
-  integer :: i
+  integer :: i,ii,nhead
 
   !set current problem size
   if(Nind_start < 0)then
@@ -99,7 +99,7 @@ subroutine init_bio(g,Nind_start)
     call get_state('x',g,x)
     call get_state('y',g,y)
     !gom
-    call random_square(g%Nind,8.751e5_sp,9.01e5_sp,-7.55e4_sp,-4.567e4_sp,x,y) 
+    !call random_square(g%Nind,8.751e5_sp,9.01e5_sp,-7.55e4_sp,-4.567e4_sp,x,y) 
     !do i=1,g%Nind
     !  x(i) = 270000 + float(i-1)*1000. 
     !  y(i) = 154000. 
@@ -116,23 +116,34 @@ subroutine init_bio(g,Nind_start)
   ! 3D -> initialize s-coordinate
   !-----------------------------------
   if(g%space_dim > 2)then
+
     call get_state('s',g,s)
+    call get_state('x',g,x)
+    call get_state('y',g,y)
+    allocate(zpini(g%Nind))
     s = 0;
-    !do i=1,g%Nind
-    !  s(i) = -float(i-1)/float(g%Nind-1)
-    !end do
+
+   !initial condition file
+    open(unit=33,file=trim(g%init_pos_file),form='formatted')
+    read(33,*)ii,nhead
+    write(*,*)nhead
+    do i=1,nhead
+      read(33,*)
+    end do
+    do i=1,g%Nind
+      read(33,*)x(i),y(i),zpini(i),tspawn(i)
+    end do
+    if(sz_cor == 0)then
+      s = zpini
+    elseif(sz_cor == 1)then
+      write(*,*)'error initiating vertical positions, not setup for z-coord'
+      stop
+    endif 
+    close(33)
+
   endif
 
-!  skagit
-!  do i=1,g%Nind
-!    x(i) = 540006 + float(i)*100.
-!    y(i) = 5.3526256e6 + float(i)*100.
-!  end do
-!  test data
-!  do i=1,g%Nind
-!    x(i) = float(i-1)*100. 
-!    y(i) = 0.0 
-!  end do
+
 
   !add parameters to netcdf file header 
   call add_cdfglobs(g,"info","some kind of info")
@@ -157,6 +168,7 @@ subroutine advance_bio(g,mtime)
   real(sp),     intent(in   ) :: mtime
   real(sp),     pointer :: PASD(:)
   real(sp),     pointer :: T(:)
+  real(sp),     pointer :: s(:)
   integer ,     pointer :: stage(:)
   integer ,     pointer :: istatus(:)
   integer               :: i,N
@@ -167,6 +179,7 @@ subroutine advance_bio(g,mtime)
   call get_state('T',g,T)
   call get_state('status',g,istatus)
   call get_state('stage',g,stage)
+  call get_state('s',g,s)
   
   !set problem size
   N = g%nind
@@ -182,7 +195,6 @@ subroutine advance_bio(g,mtime)
   do i=1,N !main loop
 
     if(istatus(i) /= ACTIVE)cycle
-    
     !update PASD using stage-based Duration
     select case (stage(i))
     case(1)
@@ -190,9 +202,9 @@ subroutine advance_bio(g,mtime)
     case(2)
       D = 200*(T(i)-4.88)**(-1.47)
     case(3)
-      D = 252*(T(i)-5.30)**(-1.54)
+      D = 252*(T(i)-5.30)**(-1.45)
     case(4)
-      D = .3583*T(i)**2 - 14.316*T(i) + 156.895
+      D = .358833*T(i)**2 - 14.316*T(i) + 156.895
     case(5)
       D = 0.0
     case default
@@ -212,6 +224,13 @@ subroutine advance_bio(g,mtime)
         PASD(i)  = 0.0
       endif
     endif  
+   
+    !set layer 
+    if(stage(i) < 4)then
+      s(i) = -1. !bottom layer
+    else
+      s(i) = 0.  !neustonic
+    endif
  
   end do !end main loop
 
