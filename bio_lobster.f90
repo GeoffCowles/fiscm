@@ -28,14 +28,7 @@ Implicit none
 
 !parameters
 integer,parameter  :: nstages = 4
-real(sp) :: fcomp_settle = 0.5
-real(sp) :: SCF = 1.0         
 
-
-!namelist can be read from input to overide parameters
-  Namelist /NML_LOBSTER/ &
-     & fcomp_settle,     &
-     & SCF
 
 contains 
 
@@ -54,6 +47,7 @@ subroutine init_bio(g,Nind_start)
   integer :: iunit,ios
   logical :: fexist
   real(sp), pointer :: tspawn(:)
+  integer , pointer :: pid(:)
   real(sp), pointer :: x(:)
   real(sp), pointer :: y(:)
   real(sp), pointer :: s(:)
@@ -70,26 +64,12 @@ subroutine init_bio(g,Nind_start)
   g%Nind = Nind_start
 
   
-  !read the namelist (if any) 
-  if(g%paramfile /= "NONE")then
-  inquire(file=trim(g%paramfile),exist=fexist)
-  if(.not.fexist)then
-    write(*,*)'fatal error: namelist file: ',trim(g%paramfile),' does not exist, stopping...'
-    stop 
-  endif
-  iunit = 33
-  open(unit=iunit,file=trim(g%paramfile),form='formatted')
-  read(unit=iunit,nml=nml_lobster,iostat=ios)
-  if(ios /= 0)then
-    write(*,*)'fatal error: could not read lobster namelist from: ',trim(g%paramfile)
-    stop
-  endif
-  close(iunit)
-  endif ! file /= NONE
 
   !set the spawning time
   call get_state('tspawn',g,tspawn)
+  call get_state('pid',g,pid)
   tspawn = 0.0
+  pid = 0.0
   
   !set the spawning location
   !-----------------------------------
@@ -131,7 +111,7 @@ subroutine init_bio(g,Nind_start)
       read(33,*)
     end do
     do i=1,g%Nind
-      read(33,*)x(i),y(i),zpini(i),tspawn(i)
+      read(33,*)x(i),y(i),zpini(i),tspawn(i),pid(i)
     end do
     if(sz_cor == 0)then
       s = zpini
@@ -148,8 +128,6 @@ subroutine init_bio(g,Nind_start)
   !add parameters to netcdf file header 
   call add_cdfglobs(g,"info","some kind of info")
   call add_cdfglobs(g,"nstages",4)
-  call add_cdfglobs(g,"fcomp_settle",fcomp_settle)
-  call add_cdfglobs(g,"SCF",SCF)
 
   
 end subroutine init_bio 
@@ -204,7 +182,7 @@ subroutine advance_bio(g,mtime)
     case(3)
       D = 252*(T(i)-5.30)**(-1.45)
     case(4)
-      D = .358833*T(i)**2 - 14.316*T(i) + 156.895
+      D = 703.5*(T(i))**(-1.26)  !!!.358833*T(i)**2 - 14.316*T(i) + 156.895
     case(5)
       D = 0.0
     case default
@@ -212,18 +190,17 @@ subroutine advance_bio(g,mtime)
       stop
     end select
 
-    PASD(i) = PASD(i) + deltaT/(D*SCF)
+    PASD(i) = PASD(i) + deltaT/(D)
 
     !settle the post-larvae 
-    if(stage(i)==4 .and. PASD(i) > fcomp_settle)then
-       istatus(i) = SETTLED 
-       stage(i) = 5
-    else
-      if(PASD(i) > 1.0)then
-        stage(i) = stage(i) + 1
-        PASD(i)  = 0.0
-      endif
-    endif  
+    if(PASD(i) > 1.0)then
+      stage(i) = stage(i) + 1
+      PASD(i)  = 0.0
+
+    endif
+  
+    !settle at stage 5
+    if(stage(i) == 5) istatus(i) = SETTLED
    
     !set layer 
     if(stage(i) < 4)then
