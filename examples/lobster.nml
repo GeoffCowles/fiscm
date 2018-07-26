@@ -114,19 +114,15 @@
 
 
  &NML_STATEVAR
- state_varname          = 'N',
- state_longname         = 'number of individuals',
+ state_varname          = 'pid',
+ state_longname         = 'particle_id',
  state_units            = '-',
  state_netcdf_out       = 1,
  state_vartype          = 1,
- state_initval_int      = 50000,
+ state_initval_int      = 0,
  state_initval_flt      = 0.0,
  state_from_ext_var     = 'NONE'
  state_ext_var_dim      = 0
 /
 
- &NML_LOBSTER
- fcomp_settle           = 0.5,
- SCF                    = 1.0
-/
 
