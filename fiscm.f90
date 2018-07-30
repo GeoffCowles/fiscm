@@ -139,7 +139,7 @@ Program fiscm
     call sz_ini(ngroups,igroups)
     call activate(ngroups,igroups,t,sim_direction)
     call interp_forcing(ngroups,igroups,3) 
-    call cdf_out(ngroups,igroups,its,t,NCDO_OUTPUT)
+    call cdf_out(ngroups,igroups,1,t,NCDO_OUTPUT)
     call do_bio(ngroups,igroups,t,1)
     !---------------------------------------------------------
     !call exchange_forcing
@@ -158,6 +158,7 @@ Program fiscm
     ! check for activation through spawning 
     !---------------------------------------------------------
     call activate(ngroups,igroups,t,sim_direction) 
+
     !---------------------------------------------------------
     ! advect and diffuse particles 
     !---------------------------------------------------------
@@ -170,7 +171,7 @@ Program fiscm
     !---------------------------------------------------------
     ! output the particle states to a NetCDF file 
     !---------------------------------------------------------
-    call cdf_out(ngroups,igroups,its,t,NCDO_OUTPUT)
+    call cdf_out(ngroups,igroups,its+1,t,NCDO_OUTPUT)
 
     !---------------------------------------------------------
     ! report progress to screen 
@@ -179,11 +180,11 @@ Program fiscm
       if(.not. checkstatus(ngroups,igroups,t))exit
     endif
 
-
     !---------------------------------------------------------
     ! advance the biology in time 
     !---------------------------------------------------------
     call do_bio(ngroups,igroups,t,its)
+
     !---------------------------------------------------------
     ! update the time step 
     !---------------------------------------------------------
