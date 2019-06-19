@@ -214,6 +214,7 @@ Subroutine setup
   logical :: fexist
   integer, parameter :: iunit = 33
   integer :: n,ios
+  integer :: iargc
   real(sp) :: uno = 1.0
   real(sp) :: t   = 0.0
   character(len=fstr) :: buffer
