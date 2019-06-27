@@ -1729,6 +1729,7 @@ function find_element_robust(xp,yp) result(elem)
    real(sp) :: ds,my_sloc
    integer  :: i,k
 
+
    my_sloc = max(sloc,-one)
    my_sloc = min(sloc,-tinynum)
    ! N_lev = N_lay + 1
@@ -1752,7 +1753,7 @@ function find_element_robust(xp,yp) result(elem)
        k2 = 1
        f1 = one 
        f2 = zero
-     elseif(k >= N_lay)then
+     elseif(k >= N_lay .and. my_sloc < esiglay(cell,N_lay)  )then 
        k1 = N_lay
        k2 = N_lay
        f1 = one 
