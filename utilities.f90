@@ -9,6 +9,10 @@
 !
 ! Fortran90 Random Number generators from the Web
 !
+! JO 24/01/2022
+! Modifications for Ounsley et al manuscript version
+! -	Adding cross product subroutine and random seed specification
+!
 !=======================================================================
 module utilities 
 !uses
@@ -24,6 +28,7 @@ module utilities
   public isintriangle 
   public cfcheck 
   public get_unique_strings
+  public set_random_seed
   public ran1 
   public ran_from_range 
   public unitrand 
@@ -31,6 +36,7 @@ module utilities
 !  public spline
   public normal_circle
   public random_square
+  public cross_product_3
 
 interface normal    
   module procedure normal 
@@ -208,6 +214,25 @@ function gettime(insecs) result(instring)
 
   end subroutine get_unique_strings
 
+  !----------------------------------------------
+  ! JO: 19/2/2018
+  ! Set the random seed to the current time, 
+  ! to avoid repeat runs. Should avoid aliasing in
+  ! multithread by skipping sequence for each thread
+  !----------------------------------------------
+  subroutine set_random_seed()
+    integer :: values(1:8), k
+    integer, dimension(:), allocatable :: seed
+    real(8) :: r
+
+    call date_and_time(values=values)
+
+    call random_seed(size=k)
+    allocate(seed(1:k))
+    seed(:) = values(8)
+    call random_seed(put=seed)
+  end subroutine set_random_seed
+
   !-----------------------------------------------
   ! return a random number, precision "sp" using  
   ! fortran90 intrinsic "random_number"
@@ -369,6 +394,21 @@ function gettime(insecs) result(instring)
     
 
   end subroutine random_square 
+
+  !----------------------------------------
+  ! JO
+  ! Determine the cross product of two vectors
+  ! c = axb
+  !----------------------------------------
+  subroutine cross_product_3(a,b,c)
+    real(sp), intent(in)    :: a(3), b(3)
+    real(sp), intent(inout) :: c(3)
+
+    c(1) = a(2)*b(3)-a(3)*b(2)
+    c(2) = a(3)*b(1)-a(1)*b(3)
+    c(3) = a(1)*b(2)-a(2)*b(1)
+
+  end subroutine cross_product_3
 
 
 end module utilities 

@@ -3,6 +3,7 @@
 !
 ! Description
 !    - Read and setup mesh
+!    - Store calculated grid metrics for future use
 !    - Advect
 !    - Diffuse
 !    - Locate Particles
@@ -21,11 +22,28 @@
 !
 ! !REVISION HISTORY:                   
 !  Original author(s): G. Cowles 
+!  18/11/2016: J. Ounsley
+!    - Including grid metrics cache subroutines to avoid recalculation
+!      on successive runs. Adapted from Pierre Cazenave's FVCOM 
+!      implementation. The  file name and whether to force creation
+!      of the metrics file is configurable in the NML_NCVAR namelist
+!    - Fixed bug in conversion of local cartesian velocities to 
+!      spherical coordinates, and updated find_element methods to handle
+!      0/360 degree boundary
+!  1/4/2017: J. Ounsley
+!    - Added method for horizontal diffusion with repeating
+!      attempts upon collision with boundary
+!  7/4/2017: J. Ounsley
+!    - Added method for calculating the gradient of node based 
+!      field within a cell
+!  30/5/2017: J. Ounsley
+!    - Fixed bug with failure to properly initialise z coordinates
 !=======================================================================
 Module Ocean_Model 
 use gparms
 use mod_igroup
 use forcing
+use utilities
 implicit none
 
 !mesh params
@@ -44,9 +62,9 @@ real(sp), parameter:: B_RK(4)  = (/1.0_sp/6.0_sp,1.0_sp/3.0_sp, 1.0_sp/3.0_sp,1.
 real(sp), parameter:: C_RK(4) = (/0.0_sp,0.5_sp,0.5_sp,1.0_sp/)
 !Added by Xinyou Lin
   integer, allocatable :: nbe(:,:)            !!INDICES OF ELMNT NEIGHBORS^M      
-  integer, allocatable :: isonb(:)            !!NODE MARKER = 0,1,2   ^M
-  integer, allocatable :: isbce(:)     
-  integer, allocatable :: nbvt(:,:)
+  integer, allocatable :: isonb(:)            !!NODE MARKER = 0,1,2  JO - not used, but useful output
+  integer, allocatable :: isbce(:)            !! JO - not used, but useful output
+  integer, allocatable :: nbvt(:,:)           !! JO - not used, but useful output
 !dimensions
 integer :: N_lev
 integer :: N_lay
@@ -79,8 +97,13 @@ real(sp), pointer :: a1u(:,:)
 real(sp), pointer :: a2u(:,:)
 character(len=10)  :: x_char,y_char,h_char,u_char,v_char, &
   kh_char,viscofm_char,ua_char,va_char,nv_char,nbe_char,aw0_char,awx_char,awy_char,a1u_char, &
-  a2u_char,nele_char,node_char,zeta_char,omega_char,         &
-  siglay_char,siglev_char,wu_char,wv_char
+  a2u_char,art_char,nele_char,node_char,zeta_char,omega_char,         &
+  siglay_char,siglev_char,wu_char,wv_char  
+
+  ! JO - Allow configuration of existing metrics file
+  character(len=fstr) :: metrics_file
+  logical :: force_metrics
+  
   Namelist /NML_NCVAR/  &
            x_char,   &
            y_char,   &
@@ -94,6 +117,7 @@ character(len=10)  :: x_char,y_char,h_char,u_char,v_char, &
          awy_char,   &
          a1u_char,   &
          a2u_char,   &
+         art_char,   &
       siglay_char,   &
       siglev_char,   &
           ua_char,   &
@@ -106,26 +130,38 @@ character(len=10)  :: x_char,y_char,h_char,u_char,v_char, &
            v_char,   &
        omega_char,   &
           kh_char,   &
-     viscofm_char 
- 
-!
+     viscofm_char,   &
+       ! JO - Allow configuration of metrics file
+       !      This file stores calculated grid metrics to save time on
+       !      future runs. Is alsoo useful for post. proc.
+       !      TODO consider wether this should be on this namelist
+       metrics_file, & ! The name of the metrics file to be loaded/saved
+       force_metrics   ! Flag to indicate a forced load of the metrics file
 
 logical :: grid_metrics
 
 interface interp
   module procedure interp_float2D
   module procedure interp_float3D
-end interface
+end interface interp
 
+! JO - This is no longer in use, interp is called
+!      instead
 interface interp_from_nodes
   module procedure interp_flt_from_nodes 
-end interface
+end interface interp_from_nodes
+
+interface gradient
+   module procedure gradient_float2D
+   module procedure gradient_float3D
+end interface gradient
 
 contains
 
 !----------------------------------------------------
 ! Read the mesh and interpolation coefficients 
 ! Add mesh to output files for viz
+! If exist, load pre calculated metrics
 !----------------------------------------------------
 subroutine ocean_model_init(ng,g,lsize,varlist)
   use utilities, only : drawline,cfcheck
@@ -140,6 +176,14 @@ subroutine ocean_model_init(ng,g,lsize,varlist)
   integer :: subset(3)
   integer :: i,n,ierr,ofid,k
   integer :: x_vid,y_vid,h_vid,nv_vid,nele_did,node_did,three_did,zeta_vid
+  logical :: FEXIST
+  ! JO - now configurable throught the namelist 
+  !character(len=fstr) :: METIN, METOUT
+
+  ! JO - Initialise the metric file name and whether
+  !      or not to overwrite current metrics file
+  metrics_file = "./metrics.nc"
+  force_metrics = .false.
 
   !return if group spatial dimensions are all 0-d or 1-d
   if(maxval(g%space_dim) < 2)return
@@ -178,8 +222,11 @@ subroutine ocean_model_init(ng,g,lsize,varlist)
       lsize = lsize + 1 ; varlist(lsize) = wu_char
       lsize = lsize + 1 ; varlist(lsize) = wv_char
       endif
-      lsize = lsize + 1 ; varlist(lsize) = kh_char
-      if (g(n)%hdiff_type ==2)then
+      ! JO - kh_char only for active vdiff (not present in SSM model)
+      if (g(n)%vdiff_type > 0) then
+        lsize = lsize + 1 ; varlist(lsize) = kh_char
+      endif
+      if (g(n)%hdiff_type ==HDIFF_VARIABLE)then
         lsize = lsize + 1 ; varlist(lsize) = viscofm_char
       endif
     endif
@@ -216,7 +263,6 @@ subroutine ocean_model_init(ng,g,lsize,varlist)
   allocate(awx(N_elems,3)) ; awx = zero
   allocate(awy(N_elems,3)) ; awy = zero
   allocate(tri(N_elems,3))
-  allocate(nbe(N_elems,3))
   allocate(siglay(N_verts,N_lay))
   allocate(siglev(N_verts,N_lev))
   allocate(esiglay(N_elems,N_lay))
@@ -226,18 +272,12 @@ subroutine ocean_model_init(ng,g,lsize,varlist)
   allocate(a1u(N_elems,4)) ;a1u   = zero
 
   !----------------Node, Boundary Condition, and Control Volume-----------------------!
-
- 
-  !ALLOCATE(NBE(0:N_elems,3))          ;NBE      = 0  !!INDICES OF ELEMENT NEIGHBORS
+  allocate(nbe(N_elems,3))          ;nbe      = 0  !! Indices of element neighbours
   ALLOCATE(NTVE(0:N_verts))           ;NTVE     = 0
-  ALLOCATE(ISONB(0:N_verts))          ;ISONB    = 0  !!NODE MARKER = 0,1,2
-  ALLOCATE(ISBCE(0:N_elems))          ;ISBCE    = 0
-
-
-
+  ALLOCATE(ISONB(N_verts))          ;ISONB    = 0  !!NODE MARKER = 0,1,2
+  ALLOCATE(ISBCE(N_elems))          ;ISBCE    = 0
 
   !read in mesh
- 
 
   msg = "error reading x coordinate"
   call ncdchk( nf90_inq_varid(fid,x_char,varid),msg )
@@ -252,37 +292,6 @@ subroutine ocean_model_init(ng,g,lsize,varlist)
   msg = "error reading nv coordinate"
   call ncdchk( nf90_inq_varid(fid,nv_char,varid),msg )
   call ncdchk(nf90_get_var(fid, varid, tri),msg)
-  if(ncdscan( nf90_inq_varid(fid,nbe_char,varid),msg ) )then
-    msg = "error reading nbe"
-    call ncdchk( nf90_inq_varid(fid,nbe_char,varid),msg )
-    call ncdchk(nf90_get_var(fid, varid, nbe),msg)
-  else
-    write(*,*)'WARNING:::::: NBE is not in the forcing file' 
-    write(*,*)'will try to compute internally'
-  endif
-  msg = "error reading aw0"
-  !read aw0 if they exist, otherwise use 1st order interpolation
-  if(ncdscan( nf90_inq_varid(fid,aw0_char,varid),msg ) )then
-    call ncdchk(nf90_get_var(fid, varid, aw0),msg)
-    msg = "error reading awx"
-    call ncdchk( nf90_inq_varid(fid,awx_char,varid),msg )
-    call ncdchk(nf90_get_var(fid, varid, awx),msg)
-    msg = "error reading awy"
-    call ncdchk( nf90_inq_varid(fid,awy_char,varid),msg )
-    call ncdchk(nf90_get_var(fid, varid, awy),msg)
-    msg = "error reading a1u"
-    call ncdchk( nf90_inq_varid(fid,a1u_char,varid),msg )
-    call ncdchk(nf90_get_var(fid, varid, a1u),msg)
-    msg = "error reading a2u"
-    call ncdchk( nf90_inq_varid(fid,a2u_char,varid),msg )
-    call ncdchk(nf90_get_var(fid, varid, a2u),msg)
-
-  else 
-    write(*,*)'WARNING:::::: AW0 AWX AWY Do NOT exist in forcing file'
-    write(*,*)'Proceeding with: 1st Order interpolation' 
-    write(*,*)'AW0 = 1/3; AWX=AWY = 0'
-    write(*,*)'In the future, select [grid metrics] in your NetCDF namelist'
-  endif
   msg = "error reading siglay"
   call ncdchk( nf90_inq_varid(fid,siglay_char,varid),msg )
   call ncdchk(nf90_get_var(fid, varid, siglay),msg)
@@ -291,30 +300,58 @@ subroutine ocean_model_init(ng,g,lsize,varlist)
   call ncdchk(nf90_get_var(fid, varid, siglev),msg)
 
   !read secondary connectivity (nbve/ntve) 
-  !grid_metrics = .false.
-  !msg = "dimension 'maxelem' not in the netcdf dataset"
-  !if(ncdscan( nf90_inq_dimid(fid,'maxelem',dimid),msg ) )then
-  !  call ncdchk(nf90_inquire_dimension(fid, dimid, dname, Max_Elems))
-  !  allocate(ntve(N_verts))
-  !  allocate(nbve(N_verts,Max_Elems))
-  !  msg = "error reading ntve"
-  !  call ncdchk( nf90_inq_varid(fid,'ntve',varid),msg )
-  !  call ncdchk(nf90_get_var(fid, varid, ntve),msg)
-  !  msg = "error reading nbve"
-  !  call ncdchk( nf90_inq_varid(fid,'nbve',varid),msg )
-  !  call ncdchk(nf90_get_var(fid, varid, nbve),msg)
-  !  grid_metrics = .true.
-  !else 
-! Revised by Xinyou Lin  in Jan ,2009
-!    write(*,*)'WARNING:::::: NTVE/NBVE Do NOT exist in forcing file'
-!    write(*,*)'This will slow down the element search procedure'
-!    write(*,*)'Proceeding with: 1st Order interpolation' 
-!    write(*,*)'In the future, select [grid metrics] in your NetCDF namelist'
-
-!  endif
-
+  ! JO Assume that if maxelem is not in the 
+  ! file then the following also are not
+  ! nbe, ntve, nbve, ntsn, nbsn
+  ! awx, awy, aw0, a1u, a2u
+  ! NOTE isonb and isbce are useful metrics for
+  ! plotting boundaries that are not stored in .nc files
+  grid_metrics = .false.
+  msg = "dimension 'maxelem' not in the netcdf dataset"
+  if(ncdscan( nf90_inq_dimid(fid,'maxelem',dimid),msg ) )then
+     call ncdchk(nf90_inquire_dimension(fid, dimid, dname, Max_Elems))
+    
+     allocate(ntve(N_verts))
+     allocate(nbve(N_verts,Max_Elems))
+     msg = "error reading ntve"
+     call ncdchk( nf90_inq_varid(fid,'ntve',varid),msg )
+     call ncdchk(nf90_get_var(fid, varid, ntve),msg)
+     msg = "error reading nbve"
+     call ncdchk( nf90_inq_varid(fid,'nbve',varid),msg )
+     call ncdchk(nf90_get_var(fid, varid, nbve),msg)
+     msg = "error reading nbe"
+     call ncdchk( nf90_inq_varid(fid,nbe_char,varid),msg )
+     call ncdchk(nf90_get_var(fid, varid, nbe),msg)
+   
+     msg = "error reading aw0"
+     call ncdchk(nf90_inq_varid(fid,aw0_char,varid),msg )
+     call ncdchk(nf90_get_var(fid, varid, aw0),msg)
+     msg = "error reading awx"
+     call ncdchk( nf90_inq_varid(fid,awx_char,varid),msg )
+     call ncdchk(nf90_get_var(fid, varid, awx),msg)
+     msg = "error reading awy"
+     call ncdchk( nf90_inq_varid(fid,awy_char,varid),msg )
+     call ncdchk(nf90_get_var(fid, varid, awy),msg)
+     msg = "error reading a1u"
+     call ncdchk( nf90_inq_varid(fid,a1u_char,varid),msg )
+     call ncdchk(nf90_get_var(fid, varid, a1u),msg)
+     msg = "error reading a2u"
+     call ncdchk( nf90_inq_varid(fid,a2u_char,varid),msg )
+     call ncdchk(nf90_get_var(fid, varid, a2u),msg)
+     grid_metrics = .true.
+    else 
+       write(*,*)'WARNING:::::: grid metrics Do NOT exist in forcing file'
+       write(*,*)'Will try to compute internally' 
+       write(*,*)'Proceeding with: 1st Order interpolation' 
+       write(*,*)'AW0 = 1/3; AWX=AWY = 0'
+       write(*,*)'In the future, select [grid metrics] in your NetCDF namelist'
+    endif
 
   !calculate cell center coordinates
+  ! JO - The following translates local coordinates
+  ! away from 360 / 0 degree boundary to avoid issues with 
+  ! interpolation across this boundary, xc0 and yc0 are used in
+  ! interp function
      if(spherical == 1)then
        do i=1,N_verts
        
@@ -349,17 +386,58 @@ subroutine ocean_model_init(ng,g,lsize,varlist)
     end do
     esiglev(i,N_lev)  = a3rd*(sum(siglev(subset,N_lev)))
   end do
+
   ! calculate secondary connectivity (nbve/ntve)
   !determine nbve/ntve - secondary connectivity, used
   !for searching element containing point
+    
+    ! Revised by J. Ounsley 18/11/16
+    ! If we did not find grid metrics or we are forcing overwrite
+    ! then calculate and save, alternatvively load if file already exists
+    if(.not.grid_metrics .or. force_metrics)then
+       INQUIRE(FILE=metrics_file, EXIST=FEXIST)
+       IF (FEXIST .and. .not.force_metrics) THEN
+          !--READ SAVED GRID METRICS FROM NETCDF FILE
+          WRITE (*,*) 'Attempting to load saved grid metrics'
+          WRITE (*,*) 'To recalculate delete metrics.nc' !or
+          !WRITE (*,*) 'set force_metrics to true in NML_NCVAR namelist'
+          CALL NCD_READ_METRICS(metrics_file,FEXIST)
+          ! Correct the positions using offsets VXMIN and VYMIN from netCDF metrics file !
+          ! This process would otherwise have taken place in TRIANGLE_GRID_EDGE so we need
+          ! to replicate that behaviour here					       !
+          !--------------SHIFT GRID TO UPPER RIGHT CARTESIAN-----------------------------!
+          !VX = VX - VXMIN
+          !VY = VY - VYMIN
+          !--------------CALCULATE GLOBAL ELEMENT CENTER GRID COORDINATES----------------!
+          !DO I=1,N   
+          !   XC(I)  = (VX(NV(I,1)) + VX(NV(I,2)) + VX(NV(I,3)))/3.0_SP
+          !   YC(I)  = (VY(NV(I,1)) + VY(NV(I,2)) + VY(NV(I,3)))/3.0_SP
+          !END DO
+          !XC(0) = 0.0_SP ; YC(0) = 0.0_SP    
+       END IF
+       ! Check that read metrics succeeded
+       IF (FEXIST) THEN
+          WRITE (*,*) 'Grid metrics loaded successfully'          
+       ELSE 
+          IF(force_metrics)THEN
+             WRITE (*,*) 'Forced generation of grid metrics.'          
+          ELSE
+             WRITE (*,*) 'Grid metrics cannot be loaded.'          
+          END IF
+          WRITE (*,*) 'Calling triangle_grid_edge...'
+          CALL TRIANGLE_GRID_EDGE
+          WRITE(*,*)  'Finished'
+          !--SAVE THE GRID METRICS TO NETCDF FILE
+          WRITE (*,*) 'Saving grid metrics'
+          CALL NCD_WRITE_METRICS(metrics_file)
+          WRITE (*,*) 'Grid metrics saved'
+          WRITE (*,*)
+       END IF
+    end if ! grid_metrics
 
-  !mark boundary elements
-  write(*,*)'tri grid edge'
-  CALL TRIANGLE_GRID_EDGE
-  write(*,*)'done tge' 
-  grid_metrics = .true.
-
-
+    ! At this point grid metrics were either in forcing file,
+    ! loaded from metrics file or calculated from scratch
+    grid_metrics = .true.
 
   !calculate node-based interpolation coefficients  
 
@@ -454,7 +532,7 @@ subroutine rw_hdiff_constant(g, dT)
   real(sp), pointer :: y(:)
   integer,  pointer :: istatus(:)
   integer,  pointer :: cell(:)
-  integer  :: i,np
+  integer  :: i,p,np
   real(sp) :: tscale
   real(sp), allocatable :: pdxt(:), pdyt(:)
   
@@ -486,9 +564,10 @@ subroutine rw_hdiff_constant(g, dT)
      elseif (spherical == 1)then
        do p=1,np
          if(istatus(p)==ACTIVE)then
-           pdxt(p) = x(p)  + normal()*tscale/(tpi*COS(y(p)) + 1.0E-6)
-           pdyt(p) = y(p)  + normal()*tscale/tpi
-         else
+             ! JO Fixed bug here where degree to radians conversion was missing
+             pdyt(p) = y(p)  + normal()*tscale/(radius_earth*d2r)
+             pdxt(p) = x(p)  + normal()*tscale/(radius_earth*d2r*COS(pdyt(p)*d2r) + 1.0E-6)
+          else
            pdxt(p) = x(p)
            pdyt(p) = y(p)
          endif
@@ -536,6 +615,261 @@ end subroutine rw_hdiff_constant
 
 
 !----------------------------------------------------
+! Author JO
+!
+! Adapted version of the horizontal random-walk
+! that moves to current following advection upon
+! collision
+!
+! Random-Walk horizontal diffusion with constant
+!    turbulent eddy diffusivity
+!
+! m. huret use a Gauss dist. , this probably wont
+! converge to the correct continuous form of diffusion
+! here we will use a uniform random walk
+!----------------------------------------------------
+subroutine rw_hdiff_constant_rheotaxis(g, dT)
+  use utilities, only : normal,unitrand
+    type(igroup), intent(inout) :: g
+    real(sp), intent(in) :: dT
+
+    real(sp), pointer :: x(:)
+    real(sp), pointer :: y(:)
+    real(sp), pointer :: u(:)
+    real(sp), pointer :: v(:)
+    integer,  pointer :: istatus(:)
+    integer,  pointer :: cell(:)
+    integer  :: i,np,p,attempt
+    real(sp) :: tscale, dist
+    real(sp), allocatable :: pdxt(:), pdyt(:)
+
+    !set pointers to x,y particle positions
+    call get_state('x',g,x)
+    call get_state('y',g,y)
+    call get_state('u',g,u)
+    call get_state('v',g,v)
+    call get_state('status',g,istatus)
+    call get_state('cell',g,cell)
+
+    !set dimensions for loops and time step
+    np = g%nind
+
+    allocate(pdxt(np))  ;
+    allocate(pdyt(np))  ;
+    !set diffusive time scale
+    tscale = sqrt(2.*dT*g%hdiff_const_val)
+
+    !horizontal random walk
+    !$OMP PARALLEL DO SCHEDULE(STATIC) IF(multithread) 
+    do p=1,np
+       ! Is this particle currently active?
+       if(istatus(p)==ACTIVE)then
+
+         
+
+           if(spherical==0)then
+                pdxt(p) = x(p) + normal()*tscale
+                pdyt(p) = y(p) + normal()*tscale
+
+           elseif (spherical == 1)then
+                pdyt(p) = y(p)  + normal()*tscale/(radius_earth*d2r)
+                pdxt(p) = x(p)  + normal()*tscale/(radius_earth*d2r*COS(pdyt(p)*d2r) + 1.0E-6)
+
+                if( pdxt(p) < 0.0_SP)  pdxt(p) = pdxt(p) + 360.0_SP
+                if( pdxt(p) > 360.0_SP) pdxt(p) = pdxt(p) - 360.0_SP
+
+                if( pdyt(p) > 90.0_SP)  pdyt(p) = 180.0_SP - pdyt(p)
+                if( pdyt(p) < -90.0_SP) pdyt(p) =  - 180.0_SP - pdyt(p)
+
+           endif !if spherical
+
+             ! Use some of the elements from the find_element 
+             ! routine to find this particle specifically
+             ! If the particle is not in a valid cell, keep looking
+
+       cell(p) = find_element_lazy(pdxt(p),pdyt(p),cell(p))
+       if(cell(p) == 0) then ! Did not find valid cell, keep looking
+           cell(p) = find_element_robust(pdxt(p),pdyt(p)) 
+       end if        
+         
+       ! Did we fail to find a valid cell?
+       ! If so, move with current
+       if(cell(p) == 0) then
+	   !print *,'Collision on diffusion' 
+	   dist = normal()
+	   if(spherical==0)then
+               pdxt(p) = x(p) + dist*tscale*u(p) / (sqrt(u(p)**2+v(p)**2) + 1.0E-6)
+               pdyt(p) = y(p) + dist*tscale*v(p) / (sqrt(u(p)**2+v(p)**2) + 1.0E-6)
+           elseif(spherical==1)then
+               pdyt(p) = y(p) + dist*tscale*v(p) / (radius_earth*d2r*sqrt(u(p)**2+v(p)**2) + 1.0E-6)
+               pdxt(p) = x(p) + dist*tscale*u(p) / (radius_earth*d2r*COS(pdyt(p)*d2r)*sqrt(u(p)**2+v(p)**2) + 1.0E-6)
+
+
+               if( pdxt(p) < 0.0_SP)  pdxt(p) = pdxt(p) + 360.0_SP
+               if( pdxt(p) > 360.0_SP) pdxt(p) = pdxt(p) - 360.0_SP
+
+               if( pdyt(p) > 90.0_SP)  pdyt(p) = 180.0_SP - pdyt(p)
+               if( pdyt(p) < -90.0_SP) pdyt(p) =  - 180.0_SP - pdyt(p)
+           end if
+       end if
+
+       cell(p) = find_element_lazy(pdxt(p),pdyt(p),cell(p)) 
+       if(cell(p) == 0) then ! Did not find valid cell, keep looking
+           cell(p) = find_element_robust(pdxt(p),pdyt(p)) 
+       end if        
+       
+       ! Did we fail to find a valid cell?
+       ! If so mark as exited
+       if(cell(p) == 0) then 
+            istatus(p) = EXITED       
+            !print *,'Failed to avoid collision after rheotaxis'
+       end if
+
+       else ! Not active, so don't change position
+          pdxt(p) = x(p)
+          pdyt(p) = y(p)
+       end if ! if active 
+
+    end do ! do p=1,np 
+    !$OMP END PARALLEL DO
+
+
+    ! Update positions of non exited particles
+    where(istatus==ACTIVE)
+       x  = pdxt
+       y  = pdyt
+    end where
+    !!--reset position of particles which are lost from domain to last known position
+    where(istatus==EXITED)
+       istatus=ACTIVE
+    end where
+
+    !nullify pointers
+    nullify(x)
+    nullify(y)
+    nullify(istatus)
+    nullify(cell)
+    deallocate(pdxt)
+    deallocate(pdyt)
+
+end subroutine rw_hdiff_constant_rheotaxis
+
+  !----------------------------------------------------
+  ! Author JO
+  !
+  ! Adapted version of the horizontal random-walk
+  ! that repeats random sampling upon loosing the
+  ! particle, in an attempt to avoid getting stuck
+  ! upon collisions
+  !
+  ! Random-Walk horizontal diffusion with constant
+  !    turbulent eddy diffusivity
+  !
+  ! m. huret use a Gauss dist. , this probably wont
+  ! converge to the correct continuous form of diffusion
+  ! here we will use a uniform random walk
+  !----------------------------------------------------
+  subroutine rw_hdiff_constant_collision(g, dT)
+    use utilities, only : normal,unitrand
+    type(igroup), intent(inout) :: g
+    real(sp), intent(in) :: dT
+
+    real(sp), pointer :: x(:)
+    real(sp), pointer :: y(:)
+    integer,  pointer :: istatus(:)
+    integer,  pointer :: cell(:)
+    integer  :: i,np,p,attempt
+    real(sp) :: tscale
+    real(sp), allocatable :: pdxt(:), pdyt(:)
+
+    !set pointers to x,y particle positions
+    call get_state('x',g,x)
+    call get_state('y',g,y)
+    call get_state('status',g,istatus)
+    call get_state('cell',g,cell)
+
+    !set dimensions for loops and time step
+    np = g%nind
+
+    allocate(pdxt(np))  ;
+    allocate(pdyt(np))  ;
+    !set diffusive time scale
+    tscale = sqrt(2.*dT*g%hdiff_const_val)
+
+    !horizontal random walk
+    !$OMP PARALLEL DO SCHEDULE(STATIC) IF(multithread) 
+    do p=1,np
+       ! Is this particle currently active?
+       if(istatus(p)==ACTIVE)then
+
+          do attempt=1,g%hdiff_collision_repeats ! try to sample valid point multiple times
+
+             if(spherical==0)then
+                pdxt(p) = x(p) + normal()*tscale
+                pdyt(p) = y(p) + normal()*tscale
+
+             elseif (spherical == 1)then
+                pdyt(p) = y(p)  + normal()*tscale/(radius_earth*d2r)
+                pdxt(p) = x(p)  + normal()*tscale/(radius_earth*d2r*COS(pdyt(p)*d2r) + 1.0E-6)
+
+                if( pdxt(p) < 0.0_SP)  pdxt(p) = pdxt(p) + 360.0_SP
+                if( pdxt(p) > 360.0_SP) pdxt(p) = pdxt(p) - 360.0_SP
+
+                if( pdyt(p) > 90.0_SP)  pdyt(p) = 180.0_SP - pdyt(p)
+                if( pdyt(p) < -90.0_SP) pdyt(p) =  - 180.0_SP - pdyt(p)
+
+             endif !if spherical
+
+             ! Use some of the elements from the find_element 
+             ! routine to find this particle specifically
+             ! If the particle is not in a valid cell, keep looking
+
+             cell(p) = find_element_lazy(pdxt(p),pdyt(p),cell(p))
+             if(cell(p) /= 0) exit ! Found valid cell, so stop looking
+
+             cell(p) = find_element_robust(pdxt(p),pdyt(p)) 
+             if(cell(p) /= 0) exit ! Found valid cell, so stop looking             
+        
+          end do
+
+          ! Did we fail to find a valid cell?
+          ! If so mark as exited
+          if(cell(p) == 0) then 
+             istatus(p) = EXITED       
+             !print *,'Failed to avoid collision after ', g%hdiff_collision_repeats, ' repeats of hdiff'
+          end if
+
+       else ! Not active, so don't change position
+          pdxt(p) = x(p)
+          pdyt(p) = y(p)
+       endif ! if active 
+
+    end do ! do p=1,np 
+    !$OMP END PARALLEL DO
+
+
+    ! Update positions of non exited particles
+    where(istatus==ACTIVE)
+       x  = pdxt
+       y  = pdyt
+    end where
+    !!--reset position of particles which are lost from domain to last known position
+    where(istatus==EXITED)
+       istatus=ACTIVE
+    end where
+
+    !nullify pointers
+    nullify(x)
+    nullify(y)
+    nullify(istatus)
+    nullify(cell)
+    deallocate(pdxt)
+    deallocate(pdyt)
+
+  end subroutine rw_hdiff_constant_collision
+
+
+!----------------------------------------------------
 ! Random-Walk horizontal diffusion with spatially
 !   variable turbulent eddy diffusivity
 !
@@ -555,6 +889,7 @@ subroutine rw_hdiff_variable(g, dT)
   real(sp), allocatable :: viscofm(:), pdxt(:), pdyt(:)
   real(sp), allocatable :: tscale(:)
   integer  :: i,np
+  integer :: counter
 
   !set problem size and time step
   np = g%nind
@@ -571,11 +906,17 @@ subroutine rw_hdiff_variable(g, dT)
   allocate(pdxt(np))  ;
   allocate(pdyt(np))  ;
 
-    !evaluate kh at both locations
-    call interp(np,x,y,s,cell,istatus,viscofm_char,viscofm,3)
+  !evaluate kh at both locations
+  call interp(np,x,y,s,cell,istatus,viscofm_char,viscofm,3)
 
-    !update particle position using Visser modified random walk 
-     tscale = sqrt(2.*dT*viscofm)
+  !update particle position using Visser modified random walk 
+  tscale = sqrt(2.*dT*viscofm)
+
+    !JO - Fixed bug, need to initialise pdxt and pdyt to initial
+    !     positions, such that inactive particles are not changed
+    pdxt = x
+    pdyt = y
+
   !horizontal random walk
      if(spherical == 0 )then
       where(istatus == ACTIVE)
@@ -584,9 +925,11 @@ subroutine rw_hdiff_variable(g, dT)
       end where
      elseif (spherical == 1)then
       where(istatus == ACTIVE)
-       pdxt = x  + normal()*tscale/(tpi*COS(y) + 1.0E-6)
-       pdyt = y  + normal()*tscale/tpi
+          ! JO Fixed bug here where degree to radians conversion
+          pdyt = y  + normal()*tscale/(radius_earth*d2r)
+          pdxt = x  + normal()*tscale/(radius_earth*d2r*COS(pdyt*d2r) + 1.0E-6)
       end where
+       
 
       where( pdxt < 0.0_SP)
       pdxt = pdxt + 360.0_SP
@@ -827,18 +1170,24 @@ subroutine sz_trans(np,g)
   real(sp), pointer :: h(:)
   real(sp), pointer :: zeta(:)
   integer , pointer :: cell(:)
-  integer , pointer :: istatus(:)
+  ! JO Want all particles to have h and zeta
+  ! interpolated, so set a temp status to 1
+  ! for this purpose
+  !integer , pointer :: istatus(:)
+  integer           :: temp_status(np)
+  temp_status = 1
+
   call get_state('x',g,x)
   call get_state('y',g,y)
   call get_state('s',g,s)
   call get_state('z',g,z)
   call get_state('h',g,h)
   call get_state('zeta',g,zeta)
-  call get_state('status',g,istatus)
   call get_state('cell',g,cell)
 
-  call interp(np,x,y,cell,istatus,zeta_char,zeta,3)
-  call interp(np,x,y,cell,istatus,h_char,h,3)
+
+  call interp(np,x,y,cell,temp_status,zeta_char,zeta,3)
+  call interp(np,x,y,cell,temp_status,h_char,h,3)
   if(sz_cor == 1)then
 !    z  = -z + zeta 
      s  = (z - zeta)/(h + zeta)
@@ -852,7 +1201,6 @@ subroutine sz_trans(np,g)
   nullify(h)
   nullify(cell)
   nullify(zeta)
-  nullify(istatus)
 
 
 
@@ -952,6 +1300,8 @@ subroutine advect3D(g,deltaT,np,time)
   real(sp), pointer :: s(:)
   real(sp), pointer :: z(:)
   real(sp), pointer :: h(:)
+  real(sp), pointer :: u_particle(:) ! JO - Used to track particle velocity (output)
+  real(sp), pointer :: v_particle(:) ! JO - Used to track particle velocity (output)
   real(sp), pointer :: zeta(:)
   integer , pointer :: cell(:)
   integer , pointer :: istatus(:)
@@ -966,6 +1316,11 @@ subroutine advect3D(g,deltaT,np,time)
   real(sp), parameter              :: eps  = 1.0E-5
   real(sp)  :: diel
 !!!!!!!
+    ! JO - This subroutine is the most likely candidate for
+    !      parallelisation as this, and called subroutines, is
+    !      where the code spends most of its time. 
+    !      It should also be possible to parallelise advection on each
+    !      particle independantly
 
   diel=time/3600.0-int(time/3600.0/24.0)*24.0
   !set dimensions for loops and time step
@@ -976,6 +1331,8 @@ subroutine advect3D(g,deltaT,np,time)
   call get_state('s',g,s)
   call get_state('z',g,z)  
   call get_state('h',g,h)
+  call get_state('u',g,u_particle) 
+  call get_state('v',g,v_particle) 
   call get_state('zeta',g,zeta)
   call get_state('cell',g,cell)
   call get_state('status',g,istatus)
@@ -993,14 +1350,16 @@ subroutine advect3D(g,deltaT,np,time)
 
      !!Particle Position at Stage N (x,y,sigma)
      
+     ! PARALLEL candidate
      if (spherical == 0)then 
      pdx(:) = x(:)  + a_rk(ns)*deltaT*chix(:,ns-1)
      pdy(:) = y(:)  + a_rk(ns)*deltaT*chiy(:,ns-1)
      pdz(:) = s(:)  + a_rk(ns)*deltaT*chiz(:,ns-1)
 !!!!!
      elseif (spherical == 1)then 
-     pdx(:) = x(:)  + a_rk(ns)*deltaT*chix(:,ns-1)/(tpi*COS(pdy(:)) + 1.0E-6)
-     pdy(:) = y(:)  + a_rk(ns)*deltaT*chiy(:,ns-1)/tpi
+     ! JO - Corrected bug in transformation here, degree to radian transform
+     pdy(:) = y(:)  + a_rk(ns)*deltaT*chiy(:,ns-1)/(radius_earth*d2r)
+     pdx(:) = x(:)  + a_rk(ns)*deltaT*chix(:,ns-1)/(radius_earth*d2r*COS(pdy(:)*d2r) + 1.0E-6) 
      pdz(:) = s(:)  + a_rk(ns)*deltaT*chiz(:,ns-1)
           
      where( pdx < 0.0_SP)
@@ -1062,6 +1421,7 @@ subroutine advect3D(g,deltaT,np,time)
 
 !Added by Xinyou Lin for DVM modelling:WP=WP+WM
    if(dvm_bio == 1.0)then
+          ! PARALLEL candidate
       do ni = 1, np
        if(6.0 <= diel .and. diel <18.0)then
         pdzt(ni) = (1 + pdz(ni))*(h(ni)+zeta(ni))  
@@ -1085,23 +1445,40 @@ subroutine advect3D(g,deltaT,np,time)
         chiz(:,ns) = 0.0_sp
      end where
 
-end do
-
+end do !--Loop over RK Stages
   !--Sum Stage Contributions to get Updated Particle Positions-------------------!
   pdxt(:)  = x(:)
   pdyt(:)  = y(:)
   pdzt(:)  = s(:)
+  u_particle(:) = 0
+  v_particle(:) = 0
   do ns=1,mstage
      if (spherical == 0)then 
-     pdxt(:) = pdxt(:) + deltaT*chix(:,ns)*b_rk(ns)*FLOAT(istatus(:))
-     pdyt(:) = pdyt(:) + deltaT*chiy(:,ns)*b_rk(ns)*FLOAT(istatus(:))
-     pdzt(:) = pdzt(:) + deltaT*chiz(:,ns)*b_rk(ns)*FLOAT(istatus(:))
+          ! JO - Removing multiplication with istatus
+          ! as this is handled below
+     pdxt(:) = pdxt(:) + deltaT*chix(:,ns)*b_rk(ns)!*FLOAT(istatus(:))
+     pdyt(:) = pdyt(:) + deltaT*chiy(:,ns)*b_rk(ns)!*FLOAT(istatus(:))
+     pdzt(:) = pdzt(:) + deltaT*chiz(:,ns)*b_rk(ns)!*FLOAT(istatus(:))    
+
+
+
+    ! JO - Store the interpolated particle velocity
+    u_particle(:) = u_particle(:) + chix(:,ns)*b_rk(ns)!*FLOAT(istatus(:))
+    v_particle(:) = v_particle(:) + chiy(:,ns)*b_rk(ns)!*FLOAT(istatus(:))
+
 !!!!!
      elseif (spherical == 1)then 
-     pdxt(:) = pdxt(:)  + a_rk(ns)*deltaT*chix(:,ns-1)/(tpi*COS(pdy(:)) + 1.0E-6)
-     pdyt(:) = pdyt(:)  + a_rk(ns)*deltaT*chiy(:,ns-1)/tpi
-     pdzt(:) = pdzt(:)  + a_rk(ns)*deltaT*chiz(:,ns-1)
+     ! JO - Corrected bug in transformation here with degree to radian transform
+     !      Additionally, incorrect stage indices was in use, possible copy paste
+     !      error
+     pdyt(:) = pdyt(:)  + b_rk(ns)*deltaT*chiy(:,ns)/(radius_earth*d2r)
+     pdxt(:) = pdxt(:)  + b_rk(ns)*deltaT*chix(:,ns)/(radius_earth*d2r*COS(pdyt(:)*d2r) + 1.0E-6)
+     pdzt(:) = pdzt(:)  + b_rk(ns)*deltaT*chiz(:,ns)
           
+     ! JO - Store the interpolated particle velocity
+     u_particle(:) = u_particle(:) + b_rk(ns)*chix(:,ns)/(radius_earth*d2r*COS(pdyt(:)*d2r) + 1.0E-6)
+     v_particle(:) = v_particle(:) + b_rk(ns)*chiy(:,ns)/(radius_earth*d2r)
+
      where( pdxt < 0.0_SP)
      pdxt = pdxt + 360.0_SP
      end where
@@ -1118,10 +1495,9 @@ end do
 
      endif
 !!!!!
-  end do
+  end do !--Sum Stage Contributions to get Updated Particle Positions-------------------!
   call find_element(np,pdxt,pdyt,cell,istatus)
   !!--Update Only Particle Still in Water
-  
     where(istatus==ACTIVE)
       x  = pdxt
       y  = pdyt
@@ -1169,6 +1545,8 @@ end do
   nullify(s)
   nullify(z)
   nullify(h)
+  nullify(u_particle)
+  nullify(v_particle)
   nullify(zeta)
   nullify(cell)
   nullify(istatus)
@@ -1357,7 +1735,10 @@ subroutine interp_float3D(np,x,y,s,cell,istatus,vname,v,iframe)
       xoc = x(i) - xc(icell)
       yoc = y(i) - yc(icell)
         elseif(spherical == 1)then
-
+             ! JO - The following translates local coordinates
+             ! away from 360 / 0 degree boundary to avoid issues with 
+             ! interpolation across this boundary, xc0 and yc0 are similarly
+             ! translated
           if(x(i) >=90.0 .and. x(i) <=270.0)then
           xoc = x(i) - xc(icell)
           yoc = y(i) - yc(icell)
@@ -1398,6 +1779,10 @@ subroutine interp_float3D(np,x,y,s,cell,istatus,vname,v,iframe)
   !interpolate to node-based quantities
   !------------------------------------------------
   elseif(d1 == N_verts)then
+
+       ! JO
+       ! PARALLEL candidate - Test with 100 & 5000
+       ! particles show no gain in efficiency
     do i=1,np
       !set cell containing particle
       icell = cell(i)
@@ -1415,7 +1800,10 @@ subroutine interp_float3D(np,x,y,s,cell,istatus,vname,v,iframe)
       xoc = x(i) - xc(icell)
       yoc = y(i) - yc(icell)
         elseif(spherical == 1)then
-
+       ! JO - The following translates local coordinates
+       ! away from 360 / 0 degree boundary to avoid issues with 
+       ! interpolation across this boundary, xc0 and yc0 are similarly
+       ! translated
           if(x(i) >=90.0 .and. x(i) <=270.0)then
           xoc = x(i) - xc(icell)
           yoc = y(i) - yc(icell)
@@ -1462,6 +1850,238 @@ subroutine interp_float3D(np,x,y,s,cell,istatus,vname,v,iframe)
 
 end subroutine interp_float3D
 
+  !------------------------------------------------
+  ! JO
+  ! Calculate the gradient vector of a field
+  ! through taking the normal of the plane described
+  ! by the field at the current cell
+  ! Sets dx,dy to the horizontal components of the
+  ! gradient with unit magnitude in horizontal, pointing up the slope.
+  ! dv is the change in the variable over unit distance
+  !
+  ! TODO: 
+  ! 1) This does not take into account any interpolation
+  ! coefficients
+  ! 2) Currently only implemented for node based fields
+  !-------------------------------------------------
+  subroutine gradient_float2D(np,x,y,cell,istatus,vname,dx,dy,dv,iframe)
+    integer, intent(in)    :: np,iframe
+    real(sp),intent(in)    :: x(np)
+    real(sp),intent(in)    :: y(np)
+    integer, intent(in)    :: cell(np)
+    integer, intent(in)    :: istatus(np)
+    character(len=*)       :: vname
+    real(sp),intent(inout) :: dx(np),dy(np),dv(np)
+    !-------------------------------
+    real(sp), pointer :: field(:)  !pointer to FVCOM field 
+    integer :: i,icell,d1
+    integer  :: n1,n2,n3
+    real(sp) :: p1(3), p2(3), p3(3), normal(3)
+ 
+    !point to forcing variable
+    call get_forcing(trim(vname),field,iframe) 
+
+    !initialize pu,pv
+    dx = 0.0
+    dy = 0.0
+    dv = 0.0
+
+    !determine the dimensions
+    d1 = size(field,1)
+
+    if(d1 == N_verts)then !vertex-based 2-D array
+       do i=1,np
+          icell = cell(i)
+          if(istatus(i) < 1 .or. icell == 0)cycle 
+          ! These nodes should be in a clockwise orientation
+          n1  = tri(icell,1)
+          n2  = tri(icell,2)
+          n3  = tri(icell,3)
+          
+          ! The positions of the nodes, and their value
+          p1 = (/ xm(n1),ym(n1),field(n1) /)
+          p2 = (/ xm(n2),ym(n2),field(n2) /)
+          p3 = (/ xm(n3),ym(n3),field(n3) /)
+          
+          ! Returns the normal vector, 
+          ! right hand rule, 
+          ! p2-p1 X p3-p1 into page.
+          ! p2
+          ! ^
+          ! |
+          ! p1-->p3
+          ! The x and y components will point up
+          ! the gradient        
+          call cross_product_3(p2-p1,p3-p1,normal)
+          ! Scale the normal vector to have magnitude
+          ! of 1 in the horizontal. The 3rd component
+          ! is then the reciprocal of size of the vertical gradient,
+          ! or 1 / (change in variable over unit distance)
+          ! we need to take the reciprocal for the actual
+          ! magnitude of the gradient
+          normal = normal/sqrt(normal(1)**2+normal(2)**2)
+          ! Assign horizontal direction
+          dx(i) = normal(1)
+          dy(i) = normal(2)
+          dv(i) = 1.0/normal(3) ! Magnitude of gradient
+       end do
+    else
+       write(*,*)'field has horizontal dimensions that is not nodes'
+       write(*,*)'do not know how to interpolate'
+       stop
+    endif
+
+  end subroutine gradient_float2D! gradient
+ 
+
+
+
+  !------------------------------------------------
+  ! JO
+  ! Calculate the gradient vector of a field
+  ! through taking the normal of the plane described
+  ! by the field at the current cell
+  ! Sets dx,dy to the horizontal components of the
+  ! gradient with unit magnitude in horizontal, pointing up the slope.
+  ! dv is the change in the variable over unit distance
+  !
+  ! TODO: 
+  ! 1) This does not take into account any interpolation
+  ! coefficients aw0, awx, awy
+  ! 2) Currently only implemented for node based fields
+  !-------------------------------------------------
+  subroutine gradient_float3D(np,x,y,s,cell,istatus,vname,dx,dy,dv,iframe)
+    integer, intent(in)    :: np,iframe
+    real(sp),intent(in)    :: x(np)
+    real(sp),intent(in)    :: y(np)
+    real(sp),intent(in)    :: s(np)
+    integer, intent(in)    :: cell(np)
+    integer, intent(in)    :: istatus(np)
+    character(len=*)       :: vname
+    real(sp),intent(inout) :: dx(np),dy(np),dv(np)
+    !-------------------------------
+    real(sp), pointer :: field(:,:)  !pointer to FVCOM field 
+    real(sp) :: f1,f2, dx1, dx2, dy1, dy2, dv1, dv2
+    integer :: i,icell,k1,k2,ktype,d1,d2
+    integer  :: n1,n2,n3,k
+    real(sp) :: p1(3), p2(3), p3(3), normal(3)
+ 
+    !point to forcing variable
+    k = 1
+    call get_forcing(trim(vname),field,iframe) 
+
+    !initialize pu,pv
+    dx = 0.0
+    dy = 0.0
+    dv = 0.0
+
+    !determine the dimensions
+    d1 = size(field,1)
+    d2 = size(field,2)
+
+   !set vertical type (layers or levels)
+    if(d2 == N_lev)then
+       ktype = level_based 
+    else if(d2 == N_lay)then
+       ktype = layer_based 
+    else
+       write(*,*)'error in gradient_float3D'
+       write(*,*)'second dimension of field is not layers or levels'
+       write(*,*)'==: ',d2
+       stop
+    endif
+
+
+    if(d1 == N_verts)then !vertex-based 2-D array
+       do i=1,np
+          icell = cell(i)
+          if(istatus(i) < 1 .or. icell == 0)cycle 
+
+          ! Determine the vertical layer brackets and interp coeffs
+          call get_vert_interpcoefs(icell,s(i),k1,k2,f1,f2,ktype)
+
+          !print *, i,s(i),k1,k2,f1,f2
+
+          ! These nodes should be in a clockwise orientation
+          n1  = tri(icell,1)
+          n2  = tri(icell,2)
+          n3  = tri(icell,3)
+          
+          ! Layer 1
+          k = k1
+          ! The positions of the nodes, and the value of
+          ! the field at that level/layer
+          p1 = (/ xm(n1),ym(n1),field(n1,k) /)
+          p2 = (/ xm(n2),ym(n2),field(n2,k) /)
+          p3 = (/ xm(n3),ym(n3),field(n3,k) /)
+          
+          ! Returns the normal vector, 
+          ! right hand rule, 
+          ! p2-p1 X p3-p1 into page.
+          ! p2
+          ! ^
+          ! |
+          ! p1-->p3
+          ! The x and y components will point up
+          ! the gradient        
+          call cross_product_3(p2-p1,p3-p1,normal)
+          ! Scale the normal vector to have magnitude
+          ! of 1 in the horizontal. The 3rd component
+          ! is then the inverse of the vertical gradient,
+          ! or 1 / (change in variable over unit distance)
+          ! we need to take the reciprocal for the actual
+          ! magnitude of the gradient
+          if(normal(1) /= 0 .or. normal(2) /= 0)  normal = normal/sqrt(normal(1)**2.+normal(2)**2.)
+          ! Assign values
+          dx1 = normal(1)
+          dy1 = normal(2)
+          dv1 = 1.0/normal(3)
+        
+          ! Layer 2
+          k = k2
+          ! The positions of the nodes, and the value of
+          ! the field at that level/layer
+          p1 = (/ xm(n1),ym(n1),field(n1,k) /)
+          p2 = (/ xm(n2),ym(n2),field(n2,k) /)
+          p3 = (/ xm(n3),ym(n3),field(n3,k) /)
+          
+          ! Returns the normal vector, 
+          ! right hand rule, 
+          ! p2-p1 X p3-p1 into page.
+          ! p2
+          ! ^
+          ! |
+          ! p1-->p3
+          ! The x and y components will point up
+          ! the gradient        
+          call cross_product_3(p2-p1,p3-p1,normal)
+          ! Scale the normal vector to have magnitude
+          ! of 1 in the horizontal. The 3rd component
+          ! is then the inverse of the vertical gradient,
+          ! or 1 / (change in variable over unit distance)
+          ! we need to take the reciprocal for the actual
+          ! magnitude of the gradient
+          if(normal(1) /= 0 .or. normal(2) /= 0)  normal = normal/sqrt(normal(1)**2.+normal(2)**2.)
+          ! Assign values
+          dx2 = normal(1)
+          dy2 = normal(2)
+          dv2 = 1.0/normal(3)
+             
+          ! Interpolate between layers
+          dx(i) = f1*dx1 + f2*dx2
+          dy(i) = f1*dy1 + f2*dy2
+          dv(i) = f1*dv1 + f2*dv2
+
+       end do
+    else
+       write(*,*)'field has horizontal dimensions that is not nodes'
+       write(*,*)'do not know how to interpolate'
+       stop
+    endif
+
+  end subroutine gradient_float3D! gradient
+ 
+
 !----------------------------------------------------
 ! element search routine 
 !----------------------------------------------------
@@ -1474,6 +2094,12 @@ subroutine find_element(np,x,y,cell,istatus,option)
   character(len=*), optional :: option
   integer :: p
 
+  ! JO
+  ! The program spends most of its time here
+  ! particularly with large advection per timestep
+  ! which induces robust searches.
+  ! Most obvious candidate for parallelisation    
+  !$OMP PARALLEL DO SCHEDULE(STATIC) IF(multithread)
   do p=1,np
     if(istatus(p) < 0)cycle
 
@@ -1482,12 +2108,15 @@ subroutine find_element(np,x,y,cell,istatus,option)
     if(cell(p) /= 0)cycle
 
     !failed, try a robust find
-    cell(p) = find_element_robust(x(p),y(p)) 
-    if(cell(p) /= 0)cycle
+    !print *,'Failed lazy element find for p:',p
+      cell(p) = find_element_robust(x(p),y(p)) 
+      if(cell(p) /= 0)cycle
+       !print *,'Failed robust element find for p:',p
 
     !failed, update status to lost
     istatus(p) = EXITED
   end do
+  !$OMP END PARALLEL DO
 
 end subroutine find_element
 
@@ -1503,10 +2132,10 @@ function find_element_lazy(xp,yp,last) result(elem)
   real(sp), intent(in) :: xp
   real(sp), intent(in) :: yp 
   integer,  intent(in) :: last
-  integer  :: elem,j,k,test,iney
+  integer  :: elem,i,j,k,test,iney
   !---------------------------
   integer  :: pts(3)
-  real(sp) :: xv(3),yv(3)
+  real(sp) :: xv(3),yv(3),xp_test
 
   !make sure we have a mesh  
   if(.not.mesh_setup)then
@@ -1520,10 +2149,31 @@ function find_element_lazy(xp,yp,last) result(elem)
 
   !load vertices 
   pts(1:3) = tri(last,1:3)
-  xv = xm(pts)
-  yv = ym(pts)
 
-  if(isintriangle(last,xp,yp,xv,yv))then     
+    ! JO - Use the correct vertex, spherical
+    !      are translated away from 0/360
+    if(spherical==0)then
+       xv = xm(pts)
+       yv = ym(pts)
+    else if(spherical==1)then
+       xv = xm0(pts)
+       yv = ym0(pts)
+    end if
+
+    ! JO - Need to take into account elements that
+    !      cross the 0 degree boundary
+    if(spherical==0)then
+       xp_test = xp
+    elseif(spherical==1)then
+       if(xp >= 0.0_sp .and. xp <=180.0_sp)then
+          xp_test = xp + 180.0_sp
+       elseif( xp > 180.0_sp .and. xp <=360.0_sp)  then
+          xp_test = xp - 180.0_sp
+       endif
+    endif
+
+
+  if(isintriangle(last,xp_test,yp,xv,yv))then     
     elem = last
   else
     if(grid_metrics)then
@@ -1532,9 +2182,30 @@ function find_element_lazy(xp,yp,last) result(elem)
            do k=1,ntve(test)
               iney = nbve(test,k)
               pts(1:3) = tri(iney,1:3)
-              xv = xm(pts)
-              yv = ym(pts)
-              if(isintriangle(iney,xp,yp,xv,yv))then
+
+                ! JO - Use the correct vertex, spherical
+                !      are translated away from 0/360
+                if(spherical==0)then
+                   xv = xm(pts)
+                   yv = ym(pts)
+                else if(spherical==1)then
+                   xv = xm0(pts)
+                   yv = ym0(pts)
+                end if
+
+                ! JO - Need to take into account elements that
+                !      cross the 0 degree boundary 
+                if(spherical==0)then
+                   xp_test = xp
+                elseif(spherical==1)then
+                   if(xp >= 0.0_sp .and. xp <=180.0_sp)then
+                      xp_test = xp + 180.0_sp
+                   elseif( xp > 180.0_sp .and. xp <=360.0_sp)  then
+                      xp_test = xp - 180.0_sp
+                   endif
+                endif
+
+              if(isintriangle(iney,xp_test,yp,xv,yv))then
                  elem  = iney
                  exit outer
               end if
@@ -1564,7 +2235,10 @@ function find_element_robust(xp,yp) result(elem)
   real(sp) :: xv(3),yv(3)
   integer  :: pts(3),min_loc,locij(2),cnt
   integer, parameter :: max_check = 15
-  
+
+  ! JO - A temp variable for spherical adjustment
+  real(sp) :: xp_test
+
   !make sure we have a mesh  
   if(.not.mesh_setup)then
     write(*,*)'error in find_element_robust'
@@ -1575,18 +2249,55 @@ function find_element_robust(xp,yp) result(elem)
   !initialize
   elem = 0
   cnt = 0
-  radlist(1:N_elems,1) = sqrt((xc(1:N_elems)-xp)**2 + (yc(1:N_elems)-yp)**2)
+
+    ! JO - Need to take into account elements that
+    !      cross the 0 degree boundary       
+    if(spherical==0)then
+       xp_test = xp
+    else if(spherical==1)then       
+       if(xp >= 0.0_sp .and. xp <=180.0_sp)then
+          xp_test = xp + 180.0_sp
+       elseif( xp > 180.0_sp .and. xp <=360.0_sp)  then
+          xp_test = xp - 180.0_sp
+       endif
+    endif
+
+
+    if(spherical==0)then
+       radlist(1:N_elems,1) = sqrt((xc(1:N_elems)-xp_test)**2 + (yc(1:N_elems)-yp)**2)
+    else if(spherical==1) then
+       ! JO - Use the spherical centres (xc0,yc0), which are translated
+       !      away from the 0/360 boundary
+       radlist(1:N_elems,1) = sqrt((xc0(1:N_elems)-xp_test)**2 + (yc0(1:N_elems)-yp)**2)
+    end if
+
+    !print *,xp,yp  
   radlast = -1.0_sp
   l1:  do while(cnt < max_check)
     cnt = cnt+1
     locij   = minloc(radlist,radlist>radlast)
     min_loc = locij(1)
     if(min_loc == 0) then
+        print *,'min_loc=0'
       exit l1
     end if
 
-    pts(1:3) = tri(min_loc,1:3) ; xv = xm(pts) ; yv = ym(pts)
-    if(isintriangle(min_loc,xp,yp,xv,yv))then
+    pts(1:3) = tri(min_loc,1:3)
+
+       ! JO - Use the correct vertices, spherical (xm0,ym0)
+       !      are translated away from 0/360
+       if(spherical==0)then
+          xv = xm(pts)
+          yv = ym(pts)
+       else if(spherical==1)then
+          xv = xm0(pts)
+          yv = ym0(pts)
+       end if
+
+       !print *,'pts',pts
+       !print *,'xv',xv
+       !print *,'yv',yv
+    if(isintriangle(min_loc,xp_test,yp,xv,yv))then
       elem = min_loc
       exit l1
     end if
@@ -1624,6 +2335,7 @@ function find_element_robust(xp,yp) result(elem)
    !---------------------------
    real(sp) :: ds,my_sloc
    integer  :: i,k
+
 
    my_sloc = max(sloc,-one)
    my_sloc = min(sloc,-tinynum)
@@ -1669,11 +2381,16 @@ function find_element_robust(xp,yp) result(elem)
    endif
  end subroutine get_vert_interpcoefs
 
+  !----------------------------------------------------------------------
+  ! Revised by J. Ounsley 18/11/16
+  ! Adapted to allow for saving and loading of derived metrics
+  ! for successive use.
+  !----------------------------------------------------------------------
  subroutine   TRIANGLE_GRID_EDGE
   INTEGER, ALLOCATABLE, DIMENSION(:,:) :: TEMP,NB_TMP,CELLS,NBET
   INTEGER, ALLOCATABLE, DIMENSION(:)   :: CELLCNT
   INTEGER                              :: I,J,II,JJ,NTMP,NCNT,NFLAG,JJB
-  INTEGER                              :: N1,N2,N3,J1,J2,J3,MX_NBR_ELEM 
+  INTEGER                              :: N1,N2,N3,J1,J2,J3
 
   !----------------------------INITIALIZE----------------------------------------!
 
@@ -1761,21 +2478,21 @@ function find_element_robust(xp,yp) result(elem)
   !
   !----DETERMINE MAX NUMBER OF SURROUNDING ELEMENTS------------------------------!
   !
-  MX_NBR_ELEM = 0
+  Max_Elems = 0
   DO I=1,N_verts
      NCNT = 0
      DO J=1,N_elems
         IF( FLOAT(tri(J,1)-I)*FLOAT(tri(J,2)-I)*FLOAT(tri(J,3)-I) == 0.0_SP) &
              NCNT = NCNT + 1
      END DO
-     MX_NBR_ELEM = MAX(MX_NBR_ELEM,NCNT)
+     Max_Elems = MAX(Max_Elems,NCNT)
   END DO
 
   !
   !----ALLOCATE ARRAYS BASED ON MX_NBR_ELEM--------------------------------------!
   !
-  ALLOCATE(NBVE(N_verts,MX_NBR_ELEM+1))
-  ALLOCATE(NBVT(N_verts,MX_NBR_ELEM+1))
+  ALLOCATE(NBVE(N_verts,Max_Elems+1))
+  ALLOCATE(NBVT(N_verts,Max_Elems+1))
   !
   !--DETERMINE NUMBER OF SURROUNDING ELEMENTS FOR NODE I = NTVE(I)---------------!
   !--DETERMINE NBVE - INDICES OF NEIGHBORING ELEMENTS OF NODE I------------------!
@@ -1795,7 +2512,7 @@ function find_element_robust(xp,yp) result(elem)
      NTVE(I)=NCNT
   ENDDO
 
-  ALLOCATE(NB_TMP(N_verts,MX_NBR_ELEM+1))
+  ALLOCATE(NB_TMP(N_verts,Max_Elems+1))
   DO I=1,N_verts
      IF(ISONB(I) == 0) THEN
         NB_TMP(1,1)=NBVE(I,1)
@@ -1868,5 +2585,386 @@ function find_element_robust(xp,yp) result(elem)
 
 
  end subroutine TRIANGLE_GRID_EDGE
+
+  ! New subroutine to create a metrics netCDF file (to be read in on
+  ! successive launches of the offline Lagrangian code).
+  ! Pierre Cazenave, Plymouth Marine Laboratory
+  !
+  ! Modified by James Ounsley 18/11/2016
+  ! Adapted for use in FSICM
+  SUBROUTINE NCD_WRITE_METRICS(INFILE)
+    !--------------------------------------------------------------------------!
+    ! WRITE METRICS CALCULATED BY TRIANGLE_GRID_EDGE TO NETCDF FOR LATER REUSE.
+    !
+    ! INPUTS:
+    ! INFILE - netCDF output file string [max=100] [CHARACTER]
+    !
+    ! Copied from FVCOM offlag Pierre Cazenave (07/01/2015) Plymouth 
+    ! Marine Laboratory.
+    ! Adapted by J. Ounsley 18/11/2016 for FISCM
+    !--------------------------------------------------------------------------!
+
+    IMPLICIT NONE
+    !--------------------------------------------------------------------------!
+    CHARACTER(LEN=100), INTENT(IN)        :: INFILE
+    !--------------------------------------------------------------------------!
+    CHARACTER(LEN=100)                  :: TSTRING,NETCDF_CONVENTION
+    INTEGER                             :: IERR
+    INTEGER                             :: THREE_DID,MAXELEM_DID,NELE_DID,&
+         NODE_DID
+    INTEGER                             :: NBE_VID,NTVE_VID,NBVE_VID,NBVT_VID,&
+         ISONB_VID,ISBCE_VID
+    INTEGER                             :: NC_FID
+    ! Add the coordinate offsets (VXMIN and VYMIN). Thanks to Judith Wolf
+    ! (National Oceanography Centre, Liverpool, UK) for this bug report.
+    INTEGER                             :: VXMIN_VID, VYMIN_VID, MX_NBR_ELEM_VID
+    INTEGER                             :: STAT1DM(1),STAT1DN(1)
+    INTEGER                             :: STAT2D3(2),STAT2DM(2)
+    INTEGER, ALLOCATABLE                :: START(:), CNT(:)
+    !--------------------------------------------------------------------------!
+
+    IERR = NF90_CREATE(TRIM(INFILE),NF90_CLOBBER,NC_FID)
+    IF(IERR /= NF90_NOERR) THEN
+       WRITE(*,*)'Error creating',TRIM(INFILE)
+       WRITE(*,*)TRIM(NF90_STRERROR(IERR))
+       STOP
+    END IF
+
+    ! netCDF Convention string
+    NETCDF_CONVENTION = 'CF-1.0'
+
+    ! Global Attributes
+    TSTRING = "FVCOM Offline Lagrangian Grid Metrics File"
+    IERR = NF90_PUT_ATT(NC_FID,NF90_GLOBAL,"title",TSTRING)
+    IERR = NF90_PUT_ATT(NC_FID,NF90_GLOBAL,"institution","SMAST, PML")
+    IERR = NF90_PUT_ATT(NC_FID,NF90_GLOBAL,"source","OFFLINE_FVCOM")
+    IERR = NF90_PUT_ATT(NC_FID,NF90_GLOBAL,"Conventions",TRIM(NETCDF_CONVENTION))
+
+    ! Dimensioning
+    IERR = NF90_DEF_DIM(NC_FID,"node",N_verts,NODE_DID)
+    IERR = NF90_DEF_DIM(NC_FID,"nele",N_elems,NELE_DID)
+    IERR = NF90_DEF_DIM(NC_FID,"maxelem",Max_Elems+1,MAXELEM_DID)
+    IERR = NF90_DEF_DIM(NC_FID,"three",3,THREE_DID)
+
+    STAT2DM      = (/NODE_DID,MAXELEM_DID/)     !!Static 2d var [nodes,9]
+    STAT2D3      = (/NELE_DID,THREE_DID/)       !!Static 2d var [elements,3]
+    STAT1DM      = (/NODE_DID/)                 !!Static 1d var [nodes]
+    STAT1DN      = (/NELE_DID/)                 !!Static 1d var [elements]
+
+    ! Variable Definitions
+
+    !!===== NBE ===============================================================!
+    IERR = NF90_DEF_VAR(NC_FID,"nbe",NF90_INT,STAT2D3,NBE_VID)
+    IERR = NF90_PUT_ATT(NC_FID,NBE_VID,"long_name","Element neighbour indices")
+    IERR = NF90_PUT_ATT(NC_FID,NBE_VID,"short_name","NBE")
+
+    !!===== NTVE ==============================================================!
+    IERR = NF90_DEF_VAR(NC_FID,"ntve",NF90_INT,STAT1DM,NTVE_VID)
+    IERR = NF90_PUT_ATT(NC_FID,NTVE_VID,"long_name",&
+         "Number of surrounding elements")
+    IERR = NF90_PUT_ATT(NC_FID,NTVE_VID,"short_name","NTVE")
+
+    !!===== NBVE ==============================================================!
+    IERR = NF90_DEF_VAR(NC_FID,"nbve",NF90_INT,STAT2DM,NBVE_VID)
+    IERR = NF90_PUT_ATT(NC_FID,NBVE_VID,"long_name",&
+         "Indices of a nodes neighbouring elements")
+    IERR = NF90_PUT_ATT(NC_FID,NBVE_VID,"short_name","NBVE")
+
+    !!===== NBVT ==============================================================!
+    IERR = NF90_DEF_VAR(NC_FID,"nbvt",NF90_INT,STAT2DM,NBVT_VID)
+    IERR = NF90_PUT_ATT(NC_FID,NBVT_VID,"long_name", &
+         "Index (1, 2 or 3) of a node in a neighbouring element")
+    IERR = NF90_PUT_ATT(NC_FID,NBVT_VID,"short_name","NBVT")
+
+    !!===== ISBCE =============================================================!
+    IERR = NF90_DEF_VAR(NC_FID,"isbce",NF90_INT,STAT1DN,ISBCE_VID)
+    IERR = NF90_PUT_ATT(NC_FID,ISBCE_VID,"long_name",&
+         "Boundary element (1) or not (0)")
+    IERR = NF90_PUT_ATT(NC_FID,ISBCE_VID,"short_name","ISBCE")
+
+    !!===== ISONB =============================================================!
+    IERR = NF90_DEF_VAR(NC_FID,"isonb",NF90_INT,STAT1DM,ISONB_VID)
+    IERR = NF90_PUT_ATT(NC_FID,ISONB_VID,"long_name",&
+         "Boundary node marker (0, 1 or 2)")
+    IERR = NF90_PUT_ATT(NC_FID,ISONB_VID,"short_name","ISONB")
+
+    !JW
+    !!===== VXMIN, VYMIN ======================================================!
+    !IERR = NF90_DEF_VAR(NC_FID,"vxmin",NF90_FLOAT,VXMIN_VID)
+    !IERR = NF90_PUT_ATT(NC_FID,VXMIN_VID,"long_name","Minimum x-value in mesh")
+    !IERR = NF90_PUT_ATT(NC_FID,VXMIN_VID,"short_name","VXMIN")
+
+    !IERR = NF90_DEF_VAR(NC_FID,"vymin",NF90_FLOAT,VYMIN_VID)
+    !IERR = NF90_PUT_ATT(NC_FID,VYMIN_VID,"long_name","Minimum y-value in mesh")
+    !IERR = NF90_PUT_ATT(NC_FID,VXMIN_VID,"short_name","VYMIN")
+    !JW
+
+    !!===== Max_Elems =======================================================!
+    IERR = NF90_DEF_VAR(NC_FID,"mx_nbr_elem",NF90_INT,MX_NBR_ELEM_VID)
+    IERR = NF90_PUT_ATT(NC_FID,MX_NBR_ELEM_VID,"long_name", &
+         "Maximum number of surrounding elements")
+    IERR = NF90_PUT_ATT(NC_FID,MX_NBR_ELEM_VID,"short_name","Max_Elems")
+
+    ! End definition section
+    IERR = NF90_ENDDEF(NC_FID)
+
+    IF(IERR /= NF90_NOERR) THEN
+       WRITE(*,*)'ERROR OPENING ',TRIM(INFILE)
+       WRITE(*,*)TRIM(NF90_STRERROR(IERR))
+       STOP
+    END IF
+
+    ! Write NBE [N,3]
+    ALLOCATE(START(2))
+    ALLOCATE(CNT(2))
+    START = 1
+    CNT(1) = N_elems
+    CNT(2) = 3
+    IERR = NF90_PUT_VAR(NC_FID,NBE_VID,NBE,START,CNT)
+    IF(IERR /= NF90_NOERR)THEN
+       WRITE(*,*)'Error putting variable: nbe'
+       WRITE(*,*)TRIM(NF90_STRERROR(IERR))
+       STOP
+    END IF
+    DEALLOCATE(START)
+    DEALLOCATE(CNT)
+
+    ! Write NTVE [M]
+    ALLOCATE(START(1))
+    ALLOCATE(CNT(1))
+    START = 1
+    CNT = N_verts
+    IERR = NF90_PUT_VAR(NC_FID,NTVE_VID,NTVE,START,CNT)
+    IF(IERR /= NF90_NOERR)THEN
+       WRITE(*,*)'Error putting variable: ntve'
+       WRITE(*,*)TRIM(NF90_STRERROR(IERR))
+       STOP
+    END IF
+
+    ! Write ISONB [M]
+    IERR = NF90_PUT_VAR(NC_FID,ISONB_VID,ISONB,START,CNT)
+    IF(IERR /= NF90_NOERR)THEN
+       WRITE(*,*)'Error putting variable: isonb'
+       WRITE(*,*)TRIM(NF90_STRERROR(IERR))
+       STOP
+    END IF
+    DEALLOCATE(START)
+    DEALLOCATE(CNT)
+
+    ! Write NBVE [M,9]
+    ALLOCATE(START(2))
+    ALLOCATE(CNT(2))
+    START = 1
+    CNT(1) = N_verts
+    CNT(2) = Max_Elems
+    IERR = NF90_PUT_VAR(NC_FID,NBVE_VID,NBVE,START,CNT)
+    IF(IERR /= NF90_NOERR)THEN
+       WRITE(*,*)'Error putting variable: nbve'
+       WRITE(*,*)TRIM(NF90_STRERROR(IERR))
+       STOP
+    END IF
+
+    ! Write NBVT [M,9]
+    IERR = NF90_PUT_VAR(NC_FID,NBVT_VID,NBVT,START,CNT)
+    IF(IERR /= NF90_NOERR)THEN
+       WRITE(*,*)'Error putting variable: nbvt'
+       WRITE(*,*)TRIM(NF90_STRERROR(IERR))
+       STOP
+    END IF
+    DEALLOCATE(START)
+    DEALLOCATE(CNT)
+
+    ! Write ISBCE [N]
+    ALLOCATE(START(1))
+    ALLOCATE(CNT(1))
+    START = 1
+    CNT = N_elems
+    IERR = NF90_PUT_VAR(NC_FID,ISBCE_VID,ISBCE,START,CNT)
+    IF(IERR /= NF90_NOERR)THEN
+       WRITE(*,*)'Error putting variable: isbce'
+       WRITE(*,*)TRIM(NF90_STRERROR(IERR))
+       STOP
+    END IF
+    DEALLOCATE(START)
+    DEALLOCATE(CNT)
+
+    !JW
+    ! Write VXMIN, VYMIN
+    !IERR = NF90_PUT_VAR(NC_FID,VXMIN_VID,VXMIN)
+    !IF(IERR /= NF90_NOERR)THEN
+    !   WRITE(*,*)'Error putting variable: vxmin'
+    !   WRITE(*,*)TRIM(NF90_STRERROR(IERR))
+    !   STOP
+    !END IF
+    !IERR = NF90_PUT_VAR(NC_FID,VYMIN_VID,VYMIN)
+    !IF(IERR /= NF90_NOERR)THEN
+    !   WRITE(*,*)'Error putting variable: vymin'
+    !   WRITE(*,*)TRIM(NF90_STRERROR(IERR))
+    !   STOP
+    !END IF
+    !JW
+
+    ! Write MX_NBR_ELEM
+    IERR = NF90_PUT_VAR(NC_FID,MX_NBR_ELEM_VID,Max_Elems)
+    IF(IERR /= NF90_NOERR)THEN
+       WRITE(*,*)'Error putting variable: mx_nbr_elem'
+       WRITE(*,*)TRIM(NF90_STRERROR(IERR))
+       STOP
+    END IF
+
+    ! Close file
+    IERR = NF90_CLOSE(NC_FID)
+
+  END SUBROUTINE NCD_WRITE_METRICS
+
+  SUBROUTINE NCD_READ_METRICS(INFILE,SUCCESS)
+    !--------------------------------------------------------------------------!
+    ! READ DATA FROM METRICS NETCDF FILE
+    !
+    ! INPUTS:
+    ! INFILE - netCDF input file string [max=100] [CHARACTER]
+    !
+    ! Copied from Pierre Cazenave's implementation in FVCOM offlag
+    ! (08/01/2015) Plymouth Marine Laboratory.
+    ! Adapted for FISCM by J. Ounsley 18/11/2016
+    !--------------------------------------------------------------------------!
+    IMPLICIT NONE
+
+    !--------------------------------------------------------------------------!
+    CHARACTER(LEN=100), INTENT(IN)              :: INFILE
+    LOGICAL, INTENT(OUT)                        :: SUCCESS
+    !--------------------------------------------------------------------------!
+    INTEGER            :: IERR    
+    INTEGER            :: VXMIN_VID, VYMIN_VID, MX_NBR_ELEM_VID
+    !--------------------------------------------------------------------------!
+    INTEGER             :: NC_FID,varid
+    CHARACTER(len=mstr) :: msg
+    CHARACTER(len=fstr) :: dname
+    INTEGER             :: temp_nele, temp_node
+
+    SUCCESS = .FALSE.
+
+    ! Open netCDF Datafile
+    IERR = NF90_OPEN(TRIM(INFILE),NF90_NOWRITE,NC_FID)
+    IF(IERR /= NF90_NOERR)THEN
+       WRITE(*,*)'ERROR READING ',TRIM(INFILE)
+       WRITE(*,*)TRIM(NF90_STRERROR(IERR))
+    END IF
+
+
+    ! JO Check that the mesh of this metrics file has the
+    ! same number of nodes and elements as the forcing file
+    ! determine number of elements
+    msg = "dimension 'nele' not in the netcdf dataset"
+    call ncdchk(nf90_inq_dimid(NC_FID, "nele", varid ),msg)
+    call ncdchk(nf90_inquire_dimension(NC_FID, varid, dname, temp_nele ))
+
+    ! determine number of nodes 
+    msg = "dimension 'node' not in the netcdf dataset"
+    call ncdchk(nf90_inq_dimid(NC_FID, "node", varid ),msg)
+    call ncdchk(nf90_inquire_dimension(NC_FID, varid, dname, temp_node ))
+
+    if (temp_nele /= N_elems .and. temp_node /= N_verts) then
+       write(*,*) "WARNING::: variables 'node' and 'nele' in metrics file"
+       write(*,*) "do not match values in forcing file."
+       ! Do not read the metrics file
+       return
+    end if
+
+
+    !!===== Max_Elems =======================================================!
+    IERR = NF90_INQ_VARID(NC_FID,'mx_nbr_elem',MX_NBR_ELEM_VID)
+    IF(IERR /=NF90_NOERR)THEN
+       WRITE(*,*)'error getting variable id: mx_nbr_elem'
+       WRITE(*,*)TRIM(NF90_STRERROR(IERR))
+       STOP
+    END IF
+    IERR = NF90_GET_VAR(NC_FID,MX_NBR_ELEM_VID,Max_Elems)
+    IF(IERR /= NF90_NOERR)THEN
+       WRITE(*,*)'Error getting variable: mx_nbr_elem'
+       WRITE(*,*)TRIM(NF90_STRERROR(IERR))
+       STOP
+    END IF
+
+    !!===== NBE ===============================================================!
+    msg = "error reading nbe"
+    call ncdchk(nf90_inq_varid(NC_FID,'nbe',varid),msg)
+    call ncdchk(nf90_get_var(NC_FID,varid,nbe),msg)
+
+    !!===== NTVE ==============================================================!
+    msg = "error reading ntve"
+    call ncdchk(nf90_inq_varid(NC_FID,'ntve',varid),msg)
+    call ncdchk(nf90_get_var(NC_FID,varid,ntve),msg)
+
+    !!===== NBVE ==============================================================!
+    ! pica:
+    ! We reallocate these here because if were reading the metrics from netCDF,
+    ! the call to ALLOC_VARS happens before weve read in the data, so we end up
+    ! with incorrectly shaped arrays.
+    ALLOCATE(NBVE(N_verts,Max_Elems))
+    msg = "error reading nbve"
+    call ncdchk(nf90_inq_varid(NC_FID,'nbve',varid),msg)
+    call ncdchk(nf90_get_var(NC_FID,varid,nbve),msg)
+
+    !!===== NBVT ==============================================================!
+    ! pica:
+    ! We reallocate these here because if were reading the metrics from netCDF,
+    ! the call to ALLOC_VARS happens before weve read in the data, so we end up
+    ! with incorrectly shaped arrays.
+    ALLOCATE(NBVT(N_verts,Max_Elems))
+    msg = "error reading nbvt"
+    call ncdchk(nf90_inq_varid(NC_FID,'nbvt',varid),msg)
+    call ncdchk(nf90_get_var(NC_FID,varid,nbvt),msg)
+
+    !!===== ISBCE =============================================================!
+    msg = "error reading isbce"
+    call ncdchk(nf90_inq_varid(NC_FID,'isbce',varid),msg)
+    call ncdchk(nf90_get_var(NC_FID,varid,isbce),msg)
+
+    !!===== ISONB =============================================================!
+    msg = "error reading isonb"
+    call ncdchk(nf90_inq_varid(NC_FID,'isonb',varid),msg)
+    call ncdchk(nf90_get_var(NC_FID,varid,isonb),msg)
+
+    !JW
+    ! Read VXMIN, VYMIN
+    !   CALL GETSVAR(NC_FID,LEN_TRIM('vxmin'),'vxmin',1,1,VXMIN)
+    !   CALL GETSVAR(NC_FID,LEN_TRIM('vymin'),'vymin',1,1,VYMIN)
+    ! pica: Because the VXMIN and VYMIN values are single values, we
+    ! can''t use GETSVAR to write them to netCDF, so do so manually here
+    ! instead.
+    !IERR = NF90_INQ_VARID(NC_FID,'vxmin',VXMIN_VID)
+    !IF(IERR /=NF90_NOERR)THEN
+    !   WRITE(*,*)'error getting variable id: vxmin'
+    !   WRITE(*,*)TRIM(NF90_STRERROR(IERR))
+    !   STOP
+    !END IF
+    !IERR = NF90_GET_VAR(NC_FID,VXMIN_VID,VXMIN)
+    !IF(IERR /= NF90_NOERR)THEN
+    !   WRITE(*,*)'Error getting variable: vxmin'
+    !   WRITE(*,*)TRIM(NF90_STRERROR(IERR))
+    !   STOP
+    !END IF
+    !IERR = NF90_INQ_VARID(NC_FID,'vymin',VYMIN_VID)
+    !IF(IERR /=NF90_NOERR)THEN
+    !   WRITE(*,*)'error getting variable id: vymin'
+    !   WRITE(*,*)TRIM(NF90_STRERROR(IERR))
+    !   STOP
+    !END IF
+    !IERR = NF90_GET_VAR(NC_FID,VYMIN_VID,VYMIN)
+    !IF(IERR /= NF90_NOERR)THEN
+    !   WRITE(*,*)'Error getting variable: vymin'
+    !   WRITE(*,*)TRIM(NF90_STRERROR(IERR))
+    !   STOP
+    !END IF
+    !JW
+
+    ! Close file
+    IERR = NF90_CLOSE(NC_FID)
+
+    SUCCESS = .TRUE.
+
+    RETURN
+  END SUBROUTINE NCD_READ_METRICS
 
 End Module Ocean_Model 

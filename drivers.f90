@@ -66,8 +66,14 @@ subroutine do_adv_diff(ng,g,dT,time)
     case(3) ! 3D Problem
     !--------------------------------------------------------------------
       call advect3D( g(n) ,dT ,g(n)%nind,time)
+      ! Added by J. Ounsley
+      ! Call any biological movement changes here
+      ! 1/2/2018 Now conditional on g(n)%biology
+      if(g(n)%biology) call advance_bio_movement(g(n),dT,time)
       if(g(n)%hdiff_type == HDIFF_CONSTANT) call rw_hdiff_constant( g(n) ,dT) 
       if(g(n)%hdiff_type == HDIFF_VARIABLE) call rw_hdiff_variable( g(n),dT)
+      if(g(n)%hdiff_type == HDIFF_CONSTANT_COLLISION) call rw_hdiff_constant_collision( g(n) ,dT) 
+      if(g(n)%hdiff_type == HDIFF_CONSTANT_RHEOTAXIS) call rw_hdiff_constant_rheotaxis( g(n) ,dT) 
       if(g(n)%vdiff_type == VDIFF_VARIABLE) call rw_vdiff(g(n), dT, g(n)%vdiff_substeps)  
       if(g(n)%vdiff_type == VDIFF_SPLINED ) call rw_vdiff_splined(g(n), dT, g(n)%vdiff_substeps)  
       if(g(n)%vdiff_type == VDIFF_BINNED  ) call rw_vdiff_binned(g(n), dT, g(n)%vdiff_substeps)  

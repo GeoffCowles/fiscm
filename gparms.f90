@@ -79,9 +79,11 @@ real(sp), parameter :: r2d = 180.0_sp/pi
 !oceanic parameters
 !    gacc        :  gravitational acceleration   [ms^-2]
 !    omega_earth :  earths rotation rate         [s^-1]
+!    radius_earth:  earths radius                [m]
 !----------------------------------------------------------------
 real(sp) :: gacc  = 9.8016_sp !default
 real(sp), parameter :: omega_earth = 7.292e-5
+real(sp), parameter :: radius_earth = 6370997.0_sp
 
 !----------------------------------------------------------------
 !large and small numbers
@@ -122,21 +124,34 @@ integer, parameter :: ACTIVE = 1
 integer, parameter :: HDIFF_NONE     = 0
 integer, parameter :: HDIFF_CONSTANT = 1
 integer, parameter :: HDIFF_VARIABLE = 2     !unfinished
+integer, parameter :: HDIFF_CONSTANT_COLLISION = 3
+integer, parameter :: HDIFF_CONSTANT_RHEOTAXIS = 4
 integer, parameter :: VDIFF_NONE     = 0
 integer, parameter :: VDIFF_VARIABLE = 1
 integer, parameter :: VDIFF_SPLINED  = 2     !unfinished
 integer, parameter :: VDIFF_BINNED   = 3     !unfinished
 !-model setup control parameters----------------------------------------------------
-integer, parameter :: max_nf = 100 
-real(sp), PARAMETER :: tpi  =3.14159265/180.0*6371.*1000.
-integer :: spherical   != 0  ! 0 - x y(m)  ;1 - lon lat(deg)
-integer ::  sz_cor     != 1  ! 0 - input s ;1 - input z
-integer :: fix_dep     != 0  ! 0 - unfixed ;1 - fix(dep)
-integer :: dvm_bio     != 1  ! 0 - nodvm   ;1 - dvm(bio)
-integer :: wind_type   != 0  ! 0 - nowind  ;1 - wind
+integer, parameter :: max_nf = 400 
+! JO 
+! TODO remove completely?
+! The existing handling of spherical coordinates was
+! incorectly implemented, no longer using tpi
+!real(sp), parameter :: tpi  =3.14159265/180.0*6371.*1000.
+integer :: spherical  != 0  ! 0 - x y(m)  ;1 - lon lat(deg)
+integer :: sz_cor     != 1  ! 0 - input s ;1 - input z
+integer :: fix_dep    != 0  ! 0 - unfixed ;1 - fix(dep)
+integer :: dvm_bio    != 1  ! 0 - nodvm   ;1 - dvm(bio)
+integer :: wind_type  != 0  ! 0 - nowind  ;1 - wind
+! J. Ounsley
+! TODO Not sure if these parameters should be defined here,
+! They are uninitialised, maybe should exist in bio or group
 real(sp)    :: dvmh_up,dvmh_dn  ! up-from surface;dn-from bottom
 real(sp)   , allocatable :: zpini(:),zptini(:)
- character(len=fstr) :: runcontrol
+character(len=fstr) :: runcontrol
+! J. Ounsley
+! Adding control parameter for multuthreading
+logical :: multithread = .false. ! .false. - serial; .true. parallel
+integer :: n_threads   = 4       ! Number of threads to run
 !----------------------------------------------------------------
 !----------------------------------------------------------------
 ! version & var character name 

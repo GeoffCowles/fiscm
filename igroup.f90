@@ -9,6 +9,9 @@
 !    
 ! !REVISION HISTORY:                   
 !  Original author(s): G. Cowles 
+!  24/4/17 J Ounsley
+!     - Addition of configuration variables for controlling
+!       repeated iteration of random horizontal walk upon collisions
 !
 !=======================================================================
 Module mod_igroup
@@ -31,6 +34,7 @@ real(sp) :: vsink = 0.0_sp
 logical  :: biology
 character(len=fstr) :: init_pos_file,group_name,fname_out
 character(len=fstr) :: statefile,paramfile
+integer  :: hdiff_collision_repeats = 5
 
 Namelist /NML_GROUP/     &
    & init_pos_file,      &
@@ -41,6 +45,7 @@ Namelist /NML_GROUP/     &
    & vdiff_type,         &
    & vdiff_const_val,    &
    & vdiff_substeps,     &
+   & hdiff_collision_repeats,   &
    & vsink,              & 
    & intvl_bio,          &
    & biology,            &
@@ -76,13 +81,14 @@ type igroup
   integer             :: nind                       !active subset
   integer             :: space_dim                  !spatial dimension of problem 0,1,2,3
   character(len=fstr) :: name                       !group name (e.g. species)
-  integer             :: hdiff_type                 !horizontal diffusion type (HDIFF_NONE,HDIFF_CONST,HDIFF_VISSER)
+  integer             :: hdiff_type                 !horizontal diffusion type (HDIFF_NONE,HDIFF_CONST,HDIFF_VISSER,HDIFF_CONST_COLLISION)
   real(sp)            :: hdiff_const_val            !constant value  
+  integer             :: hdiff_collision_repeats    ! Repeat random advection step upon collision this number of times
   integer             :: vdiff_type
   real(sp)            :: vdiff_const_val
   integer             :: vdiff_substeps
   real(sp)            :: vsink
-  integer             :: intvl_bio                  
+  integer             :: intvl_bio                  !Number of timesteps at which to increment biology
   real(sp)            :: DT_bio
   logical             :: biology
   integer             :: intvl_out
@@ -126,6 +132,14 @@ function group_(fid,id,deltaT,output_prefix) result(g)
   logical :: fexist
   real(sp) :: fval
   integer  :: ival
+  
+  ! JO 3/7/17
+  ! Set the default for statefile and paramfile
+  ! to the runcontrol file, ommiting these in group namelist
+  ! will force program to look in main config file
+  statefile = runcontrol
+  paramfile = runcontrol
+  
 
   !read the group namelist from unit fid
   read(unit=fid,nml=nml_group,iostat=ios)
@@ -170,6 +184,7 @@ function group_(fid,id,deltaT,output_prefix) result(g)
   g%name   = group_name   
   g%hdiff_type = hdiff_type
   g%hdiff_const_val = hdiff_const_val
+  g%hdiff_collision_repeats = hdiff_collision_repeats
   g%vdiff_type = vdiff_type
   g%vdiff_const_val = vdiff_const_val
   g%vdiff_substeps  = vdiff_substeps
@@ -278,7 +293,6 @@ subroutine add_state_fvec(g,varname,longname,units,output,init_val,ext_name)
 
    type(pvar)          :: new
    integer             :: i
-
    !need to make sure we arent duplicating state names!
    allocate(new%fvar(g%Tnind)) 
    do i=1,g%Tnind
@@ -452,6 +466,10 @@ subroutine print_group_summary(g)
        write(*,'(A21,F10.6)')'hdiff constant    :: ',g%hdiff_const_val
      case(HDIFF_VARIABLE)   
        write(*,'(A21,A20)')'hdiff type        :: ','HDIFF_VARIABLE'
+     case(HDIFF_CONSTANT_COLLISION) 
+       write(*,'(A21,A20)')'hdiff type        :: ',adjustl('HDIFF_CONSTANT_COLLISION')
+       write(*,'(A21,F10.6)')'hdiff constant    :: ',g%hdiff_const_val
+
    end select
    select case(g%vdiff_type)
      case(VDIFF_NONE) 

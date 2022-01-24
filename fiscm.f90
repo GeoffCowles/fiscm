@@ -8,6 +8,7 @@
 !  Original author(s): G. Cowles 
 !=======================================================================
 Module fiscm_data
+  use omp_lib
   use gparms
   use mod_igroup
   use forcing
@@ -42,7 +43,9 @@ Module fiscm_data
       dvm_bio,         &
      wind_type,        &
      dvmh_up,          &
-     dvmh_dn  
+     dvmh_dn,          &
+     multithread,      &
+     n_threads
 End Module fiscm_data
 
 Program fiscm
@@ -59,10 +62,18 @@ Program fiscm
   real(sp):: t = 0
   integer :: nvars ,uniqvars
   character(len=fstr) :: needvars(max_state_vars)
+  !JO
+  ! For calculation of the runtime
+  integer :: count_0, count_1, count_rate, count_max
+
 
   !===================================================================
   !initialize the model (read namelists, allocate data, set ic's
   !===================================================================
+
+  ! JO: 19/2/2018
+  ! Set the random seed to the date_time
+  call set_random_seed 
 
   !----------------------------------------------------------
   ! read primary simulation data and setup groups
@@ -105,7 +116,7 @@ Program fiscm
   !----------------------------------------------------------
   call update_element(ngroups,igroups) 
   if(.not. checkstatus(ngroups,igroups,t))then
-    write(*,*)'all dead'
+    write(*,*)'all dead on init'
     stop
   endif
 
@@ -131,6 +142,9 @@ Program fiscm
   !===================================================================
   call drawline("-") ; write(*,*)'Beginning Sim' ; call drawline("-")
 
+  !JO Start timer for main loop
+  call system_clock(count_0,count_rate,count_max)
+
   t = beg_time
   nits = day_2_sec*(end_time-beg_time)/deltaT
     !---------------------------------------------------------
@@ -144,6 +158,9 @@ Program fiscm
     !---------------------------------------------------------
     !call exchange_forcing
     endif
+  
+  call omp_set_num_threads(n_threads)
+
   do its=1,nits
     t = t + deltaT*sec_2_day
 
@@ -175,7 +192,7 @@ Program fiscm
     ! report progress to screen 
     !---------------------------------------------------------
     if(mod(its-1,Ireport)==0)then
-      if(.not. checkstatus(ngroups,igroups,t))exit
+      if(.not. checkstatus(ngroups,igroups,t)) exit !write(*,*)'SHOULD EXIT'
     endif
 
 
@@ -194,11 +211,20 @@ Program fiscm
   ! <=  end main loop over time 
   !===================================================================
 
+  !JO Calculate running time
+  call system_clock(count_1,count_rate,count_max)
+
   !---------------------------------------------------------
   ! cleanup data
   !---------------------------------------------------------
   call drawline("-") ; write(*,*)'Finalizing Sim' ; call drawline("-")
   deallocate(igroups)
+
+  ! JO Print main loop runtime
+  call drawline("-") 
+  write(*,*)'Main loop time ',(count_1-count_0) *1.0/count_rate 
+  call drawline("-")
+
 
 End Program fiscm
 
@@ -273,7 +299,19 @@ Subroutine setup
 
   !check for existence and open forcing file (if needed) 
   !if(trim(forcing_file) /= 'NONE' .and. trim(forcing_file) /= 'noe')then
-   if(nfiles_in > 0) then
+
+  ! J.O. Allow for specifying a (long) list of forcing files
+  ! in a serparate .txt file
+  if(index(forcing_file(1),".txt") .ne. 0) then
+     open(unit=10,file=forcing_file(1))
+     write(*,*)'reading list of forcing files:  ',forcing_file(1)     
+     do n=1,nfiles_in
+        read(10,*) forcing_file(n)
+     end do
+     close(10)
+  endif   
+
+  if(nfiles_in > 0) then
     fbeg = -1.0
     fend = -1.0
 !    call open_forcing_file(trim(forcing_file),fbeg,fend) 

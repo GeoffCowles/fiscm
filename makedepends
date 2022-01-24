@@ -22,7 +22,7 @@ gparms.o : gparms.f90
 utilities.o : utilities.f90 gparms.o 
 pvar.o : pvar.f90 utilities.o gparms.o 
 igroup.o : igroup.f90 utilities.o pvar.o gparms.o 
-bio.o : bio.f90 utilities.o output.o igroup.o gparms.o 
+bio.o : bio.f90 utilities.o output.o igroup.o gparms.o fvcom_driver.o 
 drivers.o : drivers.f90 bio.o fvcom_driver.o igroup.o gparms.o 
 output.o : output.f90 igroup.o gparms.o 
 forcing.o : forcing.f90 utilities.o igroup.o gparms.o 

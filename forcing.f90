@@ -605,11 +605,14 @@ end function valindx
 !========================================================================
 ! interface data to outside world through pointer
 !  - 1D, float
+!  JO 25/8/17
+!  Required addition of intent to field pointers
+!  p for interface to work correctly.
 !========================================================================
 subroutine get_forcing_f1(vname,p,iframe) 
   implicit none
   character(len=*) :: vname
-  real(sp), pointer :: p(:)
+  real(sp), pointer, intent(inout) :: p(:)
   integer :: i,ndims,iframe
   integer, allocatable :: dims(:)
 
@@ -636,11 +639,14 @@ end subroutine get_forcing_f1
 !========================================================================
 ! interface data to outside world through pointer
 !  - 2D, float
+!  JO 25/8/17
+!  Required addition of intent to field pointers
+!  p for interface to work correctly.
 !========================================================================
 subroutine get_forcing_f2(vname,p,iframe) 
   implicit none
   character(len=*) :: vname
-  real(sp), pointer :: p(:,:)
+  real(sp),  pointer, intent(inout) :: p(:,:)
   integer :: i,ndims,iframe
   integer, allocatable :: dims(:)
 
@@ -652,7 +658,11 @@ subroutine get_forcing_f2(vname,p,iframe)
   allocate(dims(ndims)) ; dims = 0
   dims = frame(iframe)%fdata(i)%dims
 
-  if(ndims /= 2)then
+  if(ndims == 1)then
+     !p => frame(iframe)%fdata(i)%f1
+  elseif(ndims==2)then
+     p => frame(iframe)%fdata(i)%f2
+  elseif(ndims /= 2)then
     write(*,*)'error in get_forcing_f2'
     write(*,*)'number of dimensions of variable: ',trim(vname)
     write(*,*)'is: ',ndims,' cannot put this into a 2D array'
@@ -660,7 +670,6 @@ subroutine get_forcing_f2(vname,p,iframe)
   endif
 
   !set pointer
-  p => frame(iframe)%fdata(i)%f2
 end subroutine get_forcing_f2
 
 function get_ncfid() result(fid)
@@ -741,16 +750,23 @@ subroutine open_forcing_file(ffiles_in,nfls,fbeg,fend)
   character(len=fstr) :: ffile_in
   real(sp), intent(out) :: fbeg,fend
   integer :: fid
-  character(len=mstr) :: msg
+  character(len=mstr) :: msg,msg2
   character(len=fstr) :: dname,tunits
-  integer :: varid,i,ierr,n
+  integer :: varid,i,ierr,n,nframes_check
   
   nframes=0 
   do n=1,nfls
   ffile_in=ffiles_in(n) !maybe it goes wrong
-write(*,*)ffile_in
-  msg = "error opening forcing file: "//trim(ffile_in)
-  call ncdchk( nf90_open(trim(ffile_in),nf90_nowrite,fid),msg ) 
+ write(*,*)"forcing file name: ",ffile_in
+  msg = "empty forcing file name, is nfiles_in correctly specified?"
+    if (len_trim(ffile_in)==0) then
+       write(*,*)msg
+       stop
+    endif
+
+    msg = "error opening forcing file: "//trim(ffile_in)
+    write(msg2,*)"is nfiles_in correctly specified? Files expected:",nfls
+  call ncdchk( nf90_open(trim(ffile_in),nf90_nowrite,fid),msg,msg2 ) 
   !set file name and id for this module
   nfsfid(n)   = fid
   ffile(n) = ffile_in
@@ -759,6 +775,9 @@ write(*,*)ffile_in
   msg = "reading number of dimensions from: "//trim(ffile_in)
   call ncdchk(nf90_inquire(fid, nDim,nVar,nAtt,uDid,fNum) ,msg)
   !determine number of frames in the file (size of uDid)
+    ! J. Ounsley
+    ! There is a potential issue here with files with empty frames
+    ! These are detetcable from 0 timestamps in SSM
   uD_extant = 1
   if(uDid /= 0)then
     call ncdchk(nf90_inquire_dimension(fid, uDid, dname, uD_extant ))
@@ -801,16 +820,26 @@ write(*,*)ffile_in
 
   !set begin/end/deltaT from forcing
   !make sure time is sequential
-  forcing_beg_time = ftimes(1)
-  forcing_end_time = ftimes(nframes)
-
+  ! J. Ounsley
+  ! Set nframes to last monotonically increasing frame
+  nframes_check = 1
   if(nframes > 1)then
     do i=2,nframes
       if(ftimes(i)-ftimes(i-1) <= 0.0)then
-        write(*,*)'netcdf time is not monotonically increasing'
+        write(*,*)'netcdf time is not monotonically increasing at frame',i
+        write(*,*)'skipping all subsequent frames'
+        exit
       endif
+      nframes_check = nframes_check+1
     end do
   endif
+  
+  ! update nframes
+  nframes = nframes_check
+  
+  !set begin/end/deltaT from forcing
+  forcing_beg_time = ftimes(1)
+  forcing_end_time = ftimes(nframes)
 
   !set fbeg/fend to return val
   fbeg = forcing_beg_time
@@ -818,7 +847,7 @@ write(*,*)ffile_in
     
   call drawline('-')
   write(*,*)'Opened up model forcing file: ',ffiles_in
-  write(*,*)'number of frames in file: ',nfsnrec
+  write(*,*)'number of frames in file: ',nframes
   write(*,*)'forcing begins at:',fbeg !gettime(int(fbeg)),fbeg
   write(*,*)'forcing ends   at:',fend !gettime(int(fend)),fend
   call drawline('-')
