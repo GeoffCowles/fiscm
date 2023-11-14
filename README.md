@@ -9,6 +9,8 @@ FVCOM i-state configuration model:   offline Lagrangian / IBM model for FVCOM
 
 Publications using fiscm
 
+James P Ounsley, Alejandro Gallego, David J Morris, John D Armstrong, Regional variation in directed swimming by Atlantic salmon smolts leaving Scottish waters for their oceanic feeding grounds—a modelling study, ICES Journal of Marine Science, Volume 77, Issue 1, January-February 2020, Pages 315–325, https://doi.org/10.1093/icesjms/fsz160
+
 Liu, C., Cowles, G. W., Churchill, J. H., and Stokesbury, K.D.E., (2015) Connectivity of the bay scallop (Argopecten irradians) in Buzzards Bay, Massachusetts, U.S.A. Fisheries Oceanography, 24, 364– 382.
 
 DeCelles, G., Cowles, G., Liu, C., and Cadrin, S.X, (2015). Modeled transport of winter flounder larvae spawned in coastal waters of the Gulf of Maine. Fisheries Oceanography, 24, 430–444.
